@@ -1528,6 +1528,17 @@
     chimeEl.checked = (localStorage.getItem('att_play_chime') || '1') === '1';
     chimeEl.addEventListener('change', () => localStorage.setItem('att_play_chime', chimeEl.checked ? '1' : '0'));
 
+    // Chime is baked into the front of the recording (decoded at the recorder's
+    // sample rate) so one clip guarantees chime → voice ordering on the speakers.
+    let chimeBytes = null;
+    async function chimeSamples(ctx) {
+      try {
+        if (!chimeBytes) chimeBytes = await (await fetch(API_BASE + '/static/chime.wav')).arrayBuffer();
+        const buf = await ctx.decodeAudioData(chimeBytes.slice(0));
+        return buf.getChannelData(0);
+      } catch (e) { return null; }
+    }
+
     // Meter bars
     const meter = $('att-meter'), BARS = 24, bars = [];
     for (let i = 0; i < BARS; i++) { const b = document.createElement('div'); b.className = 'bar'; meter.appendChild(b); bars.push(b); }
@@ -1584,7 +1595,7 @@
       }, 200);
     }
 
-    function stopRec() {
+    async function stopRec() {
       if (!recording) return;
       recording = false;
       clearInterval(tickId); tickId = null;
@@ -1596,11 +1607,22 @@
       if (stream) stream.getTracks().forEach(t => t.stop());
       analyser = null; cdEl.textContent = '60';
       const total = chunks.reduce((n, c) => n + c.length, 0);
-      const samples = new Float32Array(total);
-      let off = 0; for (const c of chunks) { samples.set(c, off); off += c.length; }
+      if (total < sampleRate * 0.3) { if (audioCtx) audioCtx.close(); status('✗ too short — hold to record', RED); return; }
+      const voice = new Float32Array(total);
+      let off = 0; for (const c of chunks) { voice.set(c, off); off += c.length; }
+      let out = voice;
+      if (chimeEl.checked && audioCtx) {
+        status('✈ adding chime…', AMBER);
+        const ch = await chimeSamples(audioCtx);
+        if (ch && ch.length) {
+          const gap = Math.floor(sampleRate * 0.2);
+          out = new Float32Array(ch.length + gap + voice.length);
+          out.set(ch, 0);
+          out.set(voice, ch.length + gap);
+        }
+      }
       if (audioCtx) audioCtx.close();
-      if (total < sampleRate * 0.3) { status('✗ too short — hold to record', RED); return; }
-      const blob = encodeWAV(samples, sampleRate);
+      const blob = encodeWAV(out, sampleRate);
       uploadAndBroadcast(blob);
     }
 
@@ -1621,7 +1643,7 @@
       try {
         const r = await fetch(API_BASE + '/attention/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'audio/wav', 'X-Device-Name': encodeURIComponent(deviceName), 'X-Clip-Volume': String(volSlider.value), 'X-Play-Chime': chimeEl.checked ? '1' : '0' },
+          headers: { 'Content-Type': 'audio/wav', 'X-Device-Name': encodeURIComponent(deviceName), 'X-Clip-Volume': String(volSlider.value) },
           body: blob,
         });
         const d = await r.json().catch(() => ({}));

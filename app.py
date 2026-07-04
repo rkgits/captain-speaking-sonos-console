@@ -708,22 +708,18 @@ async def _broadcast_url(client, players: list, stream_url: str, volume: int) ->
     return played, failed
 
 
-async def _broadcast_clip(fname: str, volume: int, play_chime: bool = False) -> dict:
+async def _broadcast_clip(fname: str, volume: int) -> dict:
     """Broadcast recordings/<fname> to every speaker at the given volume.
 
-    If play_chime is set, the airplane chime is queued first; Sonos plays a
-    player's audioClips in the order they were requested, so chime → voice.
+    The airplane chime (when enabled) is baked into the front of the recording
+    client-side, so a single clip guarantees chime → voice ordering.
     """
     lan_ip = get_local_ip()
     if not lan_ip:
         raise HTTPException(503, "cannot determine LAN IP for broadcast")
-    base = f"http://{lan_ip}:{PUBLIC_HTTP_PORT}"
-    stream_url = f"{base}/recordings/{fname}"
+    stream_url = f"http://{lan_ip}:{PUBLIC_HTTP_PORT}/recordings/{fname}"
     async with httpx.AsyncClient(verify=False) as client:
-        players = list(STATE.devices.items())
-        if play_chime:
-            await _broadcast_url(client, players, f"{base}/static/chime.wav", volume)
-        played, failed = await _broadcast_url(client, players, stream_url, volume)
+        played, failed = await _broadcast_url(client, list(STATE.devices.items()), stream_url, volume)
     return {"played": played, "failed": failed, "url": stream_url}
 
 
@@ -740,13 +736,12 @@ async def attention_upload(request: Request) -> dict:
         volume = int(request.headers.get("X-Clip-Volume", "45"))
     except ValueError:
         volume = 45
-    play_chime = request.headers.get("X-Play-Chime", "0").lower() in ("1", "true", "on", "yes")
     ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     fname = f"{ts}_{device_name}.wav"
     with open(os.path.join(RECORDINGS_DIR, fname), "wb") as f:
         f.write(data)
     _log.info("Attention recording saved: %s (%d bytes)", fname, len(data))
-    result = await _broadcast_clip(fname, volume, play_chime)
+    result = await _broadcast_clip(fname, volume)
     return {"ok": True, "file": fname, **result}
 
 
@@ -768,7 +763,6 @@ async def attention_list() -> dict:
 class AttentionBroadcastReq(BaseModel):
     file: str
     volume: int = 45
-    chime: bool = False
 
 
 @app.post("/attention/broadcast")
@@ -776,7 +770,7 @@ async def attention_broadcast(req: AttentionBroadcastReq) -> dict:
     fname = os.path.basename(req.file)
     if not fname.endswith(".wav") or not os.path.exists(os.path.join(RECORDINGS_DIR, fname)):
         raise HTTPException(404, "recording not found")
-    result = await _broadcast_clip(fname, req.volume, req.chime)
+    result = await _broadcast_clip(fname, req.volume)
     return {"ok": True, "file": fname, **result}
 
 
