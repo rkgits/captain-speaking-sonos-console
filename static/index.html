@@ -866,9 +866,9 @@
               <label class="chime-toggle">
                 <input type="checkbox" id="att-chime" />
                 <span class="switch"></span>
-                <span class="chime-label">✈ Play airplane chime first</span>
+                <span class="chime-label">✈ Airplane chime at start &amp; end</span>
               </label>
-              <div class="hint" style="margin-top:6px;">Sounds the seatbelt “bong”, then your announcement.</div>
+              <div class="hint" style="margin-top:6px;">Sounds the seatbelt “bong” before and after your announcement.</div>
             </div>
           </div>
           <div class="att-col">
@@ -1616,9 +1616,11 @@
         const ch = await chimeSamples(audioCtx);
         if (ch && ch.length) {
           const gap = Math.floor(sampleRate * 0.2);
-          out = new Float32Array(ch.length + gap + voice.length);
-          out.set(ch, 0);
-          out.set(voice, ch.length + gap);
+          out = new Float32Array(ch.length + gap + voice.length + gap + ch.length);
+          let p = 0;
+          out.set(ch, p); p += ch.length + gap;
+          out.set(voice, p); p += voice.length + gap;
+          out.set(ch, p);
         }
       }
       if (audioCtx) audioCtx.close();
