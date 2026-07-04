@@ -724,6 +724,8 @@
   let progressRef = null;
   // master group volume: local override during drag
   let masterLocal = { until: 0, value: null };
+  // true while a transport SOAP command is in flight — blocks all transport buttons
+  let _transportInFlight = false;
 
   // ---- Peer prediction helpers ----
   function currentSpeakerVolume(uuid) {
@@ -1151,31 +1153,28 @@
   function attachTransport(coord) {
     for (const btn of nowWrap.querySelectorAll('.t-btn')) {
       btn.addEventListener('click', async () => {
+        // Block if another command is already in flight (prevents double-tap
+        // on pause/play from sending two SOAP commands which breaks AirPlay)
+        if (_transportInFlight) return;
         const a = btn.dataset.tAction;
-        btn.disabled = true;
+        _transportInFlight = true;
+        // Disable every transport button immediately — not just the clicked one
+        for (const b of nowWrap.querySelectorAll('.t-btn')) b.disabled = true;
         try {
           const result = await apiPost('/' + a, {coordinator_uuid: coord});
           if (result?._error) {
             errorBar.classList.add('show');
             errorBar.textContent = result._error;
-            setTimeout(refresh, 500);
           } else if (result?.transport) {
             latest.transport[coord] = result.transport;
-            if (a === 'play' || a === 'pause') {
-              // Toggle button in-place — full re-render would replace the DOM
-              // and new buttons can lose their handlers in certain timing scenarios.
-              const newState = result.transport.state;
-              const nowPlaying = newState === 'PLAYING';
-              btn.dataset.tAction = nowPlaying ? 'pause' : 'play';
-              btn.title = nowPlaying ? 'pause' : 'play';
-              btn.textContent = nowPlaying ? '❚❚' : '▶';
-            } else if (!activeDrag) {
-              // next/prev: full render to show new track title immediately
-              render();
-            }
           }
         } finally {
-          btn.disabled = false;
+          _transportInFlight = false;
+          // render() replaces nowWrap.innerHTML with fresh enabled buttons AND
+          // updates the state badge immediately so the user sees the new state.
+          // Old disabled buttons become detached — no stale state possible.
+          if (!activeDrag) render();
+          else for (const b of nowWrap.querySelectorAll('.t-btn')) b.disabled = false;
           setTimeout(refresh, 1500);
         }
       });
