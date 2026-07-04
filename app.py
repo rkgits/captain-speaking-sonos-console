@@ -5,8 +5,11 @@ Run: uvicorn app:app --host 127.0.0.1 --port 8787
 from __future__ import annotations
 
 import asyncio
+import collections
+import datetime
 import html
 import json
+import logging
 import os
 import re
 import subprocess
@@ -45,6 +48,24 @@ class State:
 
 STATE = State()
 _sse_clients: set[asyncio.Queue] = set()
+
+# ---------- In-memory log ring buffer ----------
+_log_ring: collections.deque = collections.deque(maxlen=200)
+
+class _RingHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        _log_ring.append({
+            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "level": record.levelname,
+            "msg": self.format(record),
+        })
+
+_log = logging.getLogger("sonos")
+_log.setLevel(logging.DEBUG)
+_rh = _RingHandler()
+_rh.setFormatter(logging.Formatter("%(message)s"))
+_log.addHandler(_rh)
+_log.propagate = False
 
 app = FastAPI(title="Sonos Wooden Console")
 app.add_middleware(
@@ -320,12 +341,14 @@ async def refresh_state() -> None:
                 seed = await find_seed(client)
         if not seed:
             STATE.last_error = "No Sonos device reachable"
+            _log.error("No Sonos device reachable on the network")
             return
 
         try:
             devices, groups = await fetch_topology(client, seed)
         except Exception as e:
             STATE.last_error = f"topology error: {e!r}"
+            _log.error("Topology fetch failed: %s", e)
             return
 
         STATE.devices = devices
@@ -337,8 +360,13 @@ async def refresh_state() -> None:
         async def vol_for(uuid: str, ip: str) -> None:
             try:
                 v, m = await asyncio.gather(get_volume(client, ip), get_mute(client, ip))
+                if STATE.volumes.get(uuid, {}).get("reachable") is False:
+                    _log.info("Device back online: %s (%s)", STATE.devices.get(uuid, {}).get("name", uuid), ip)
                 STATE.volumes[uuid] = {"volume": v, "muted": m, "reachable": True}
-            except Exception:
+            except Exception as e:
+                name = STATE.devices.get(uuid, {}).get("name", uuid)
+                if STATE.volumes.get(uuid, {}).get("reachable") is not False:
+                    _log.warning("Device unreachable: %s (%s) — %s", name, ip, e)
                 STATE.volumes[uuid] = {
                     **STATE.volumes.get(uuid, {"volume": None, "muted": None}),
                     "reachable": False,
@@ -380,11 +408,13 @@ async def refresh_state() -> None:
 
 
 async def refresh_loop() -> None:
+    _log.info("Server started — polling Sonos every %.1fs", REFRESH_INTERVAL)
     while True:
         try:
             await refresh_state()
         except Exception as e:
             STATE.last_error = f"refresh loop: {e!r}"
+            _log.error("Refresh loop crashed: %s", e)
         await asyncio.sleep(REFRESH_INTERVAL)
 
 
@@ -586,3 +616,88 @@ app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(BASE, "static", "index.html"))
+
+
+@app.get("/dashboard")
+async def dashboard():
+    from fastapi.responses import HTMLResponse
+
+    def level_color(level: str) -> str:
+        return {"ERROR": "#ff5f5f", "WARNING": "#ffb84a", "INFO": "#45e07a", "DEBUG": "#8ab4f8"}.get(level, "#ccc")
+
+    rows = ""
+    for r in reversed(list(_log_ring)):
+        color = level_color(r["level"])
+        rows += (
+            f'<tr><td class="ts">{html.escape(r["time"])}</td>'
+            f'<td class="lv" style="color:{color}">{html.escape(r["level"])}</td>'
+            f'<td class="ms">{html.escape(r["msg"])}</td></tr>\n'
+        )
+    if not rows:
+        rows = '<tr><td colspan="3" class="empty">No events logged yet.</td></tr>'
+
+    device_rows = ""
+    for uuid, d in STATE.devices.items():
+        vol = STATE.volumes.get(uuid, {})
+        reachable = vol.get("reachable", True)
+        status_color = "#45e07a" if reachable else "#ff5f5f"
+        status = "Online" if reachable else "Unreachable"
+        device_rows += (
+            f'<tr><td>{html.escape(d["name"])}</td>'
+            f'<td>{html.escape(d["ip"])}</td>'
+            f'<td style="color:{status_color}">{status}</td>'
+            f'<td>{vol.get("volume", "—")}</td></tr>\n'
+        )
+    if not device_rows:
+        device_rows = '<tr><td colspan="4" class="empty">No devices found</td></tr>'
+
+    error_html = ""
+    if STATE.last_error:
+        error_html = f'<div class="alert">⚠ {html.escape(STATE.last_error)}</div>'
+
+    page = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Sonos Dashboard</title>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: #0d1117; color: #c9d1d9; font-family: "Courier New", monospace; font-size: 13px; padding: 24px; }}
+  h1 {{ color: #f6dc83; letter-spacing: 0.3em; font-size: 18px; margin-bottom: 4px; }}
+  .sub {{ color: #666; font-size: 11px; letter-spacing: 0.2em; margin-bottom: 24px; }}
+  .back {{ color: #8ab4f8; text-decoration: none; font-size: 11px; float: right; margin-top: 4px; }}
+  .back:hover {{ color: #f6dc83; }}
+  .alert {{ background: rgba(255,80,80,0.15); border: 1px solid #ff5f5f; color: #ff5f5f; padding: 10px 14px; border-radius: 4px; margin-bottom: 20px; }}
+  h2 {{ color: #8ab4f8; font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 10px; margin-top: 28px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }}
+  table {{ width: 100%; border-collapse: collapse; }}
+  th {{ text-align: left; color: #8ab4f8; font-size: 11px; letter-spacing: 0.2em; padding: 6px 10px; border-bottom: 1px solid #21262d; }}
+  td {{ padding: 5px 10px; border-bottom: 1px solid #161b22; vertical-align: top; }}
+  tr:hover td {{ background: #161b22; }}
+  td.ts {{ color: #666; white-space: nowrap; width: 150px; }}
+  td.lv {{ font-weight: bold; width: 80px; white-space: nowrap; }}
+  td.ms {{ word-break: break-word; }}
+  td.empty {{ color: #555; text-align: center; padding: 20px; }}
+  .refresh {{ color: #666; font-size: 10px; margin-top: 20px; }}
+</style>
+<meta http-equiv="refresh" content="10"/>
+</head>
+<body>
+<a class="back" href="/">← Console</a>
+<h1>SONOS DASHBOARD</h1>
+<div class="sub">Monitoring · Auto-refreshes every 10s</div>
+{error_html}
+<h2>Devices</h2>
+<table>
+  <tr><th>Name</th><th>IP</th><th>Status</th><th>Volume</th></tr>
+  {device_rows}
+</table>
+<h2>Event Log</h2>
+<table>
+  <tr><th>Time</th><th>Level</th><th>Message</th></tr>
+  {rows}
+</table>
+<div class="refresh">Last rendered: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} · {len(_log_ring)} events in buffer</div>
+</body>
+</html>"""
+    return HTMLResponse(page)

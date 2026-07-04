@@ -79,6 +79,17 @@
     margin-top: 4px;
     opacity: 0.75;
   }
+  .brand .dash-link {
+    position: absolute; top: 10px; right: 28px;
+    font-family: "Courier New", monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--ink);
+    opacity: 0.6;
+    text-decoration: none;
+  }
+  .brand .dash-link:hover { opacity: 1; }
   .screw {
     position: absolute; width: 10px; height: 10px; border-radius: 50%;
     background: radial-gradient(circle at 35% 30%, #fff2b8, #8b6914 60%, #3a2408);
@@ -238,7 +249,7 @@
   .session-line {
     font-family: "Courier New", monospace;
     font-size: 10px;
-    color: rgba(217,183,129,0.5);
+    color: rgba(217,183,129,0.85);
     letter-spacing: 0.1em;
     margin-top: 12px;
   }
@@ -451,7 +462,7 @@
     font-size: 9px;
     color: var(--parchment);
     letter-spacing: 0.2em;
-    opacity: 0.7;
+    
     margin-bottom: 8px;
   }
 
@@ -529,9 +540,9 @@
     display: flex; flex-direction: column; justify-content: space-between;
     font-family: "Courier New", monospace;
     font-size: 8px;
-    color: var(--parchment);
+    color: var(--cream);
     letter-spacing: 0.1em;
-    opacity: 0.7;
+    
   }
   .fader-handle {
     position: absolute;
@@ -680,6 +691,7 @@
     <div class="screw tr"></div>
     <div class="screw bl"></div>
     <div class="screw br"></div>
+    <a class="dash-link" href="/dashboard">⬡ Dashboard</a>
     <h1>SONOS CONSOLE</h1>
     <div class="sub">Vintage Series · Model MMXXVI</div>
   </div>
