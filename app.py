@@ -15,8 +15,10 @@ import re
 import subprocess
 from typing import Any
 
+import urllib.parse
+
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +26,14 @@ from pydantic import BaseModel
 
 SOAP_TIMEOUT = 4.0
 REFRESH_INTERVAL = 2.0
+
+# Sonos local control (audioClip announcements) — well-known public local key, not a secret.
+SONOS_API_KEY = "123e4567-e89b-12d3-a456-426655440000"
+# Port Sonos speakers use to fetch recordings (plain HTTP; they can't use our self-signed HTTPS).
+PUBLIC_HTTP_PORT = int(os.environ.get("PUBLIC_HTTP_PORT", "8787"))
+# HTTPS port (for mic access on phones); surfaced to the UI so it can link there. 0 = none.
+HTTPS_PORT = int(os.environ.get("HTTPS_PORT", "0"))
+MAX_RECORDING_BYTES = 30 * 1024 * 1024
 
 RC_SVC = "urn:schemas-upnp-org:service:RenderingControl:1"
 AV_SVC = "urn:schemas-upnp-org:service:AVTransport:1"
@@ -295,6 +305,37 @@ def get_local_prefix() -> str | None:
     return None
 
 
+def get_local_ip() -> str | None:
+    for iface in ("en0", "en1"):
+        try:
+            ip = subprocess.check_output(["ipconfig", "getifaddr", iface], stderr=subprocess.DEVNULL).decode().strip()
+            if ip:
+                return ip
+        except Exception:
+            continue
+    return None
+
+
+async def play_audio_clip(
+    client: httpx.AsyncClient, ip: str, player_id: str, stream_url: str, volume: int | None = None
+) -> None:
+    """Play an announcement clip *over* whatever a player is doing (ducks, then restores).
+
+    Uses the Sonos local audioClip API on port 1443 (self-signed cert → caller must use
+    an httpx client with verify=False). Does not disturb the underlying AirPlay/queue source.
+    """
+    body: dict[str, Any] = {"name": "Attention", "appId": "com.sonos.console", "streamUrl": stream_url}
+    if volume is not None:
+        body["volume"] = max(0, min(100, int(volume)))
+    r = await client.post(
+        f"https://{ip}:1443/api/v1/players/{player_id}/audioClip",
+        headers={"X-Sonos-Api-Key": SONOS_API_KEY, "Content-Type": "application/json"},
+        json=body,
+        timeout=6.0,
+    )
+    r.raise_for_status()
+
+
 def arp_ips() -> list[str]:
     try:
         out = subprocess.check_output(["arp", "-a"]).decode()
@@ -434,6 +475,7 @@ def _sse_snapshot() -> str:
         "volumes": STATE.volumes,
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
+        "https_port": HTTPS_PORT,
     }
     return f"data: {json.dumps(payload)}\n\n"
 
@@ -510,6 +552,7 @@ async def api_state() -> dict:
         "volumes": STATE.volumes,
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
+        "https_port": HTTPS_PORT,
     }
 
 
@@ -634,6 +677,101 @@ async def api_group_volume(req: GroupVolReq) -> dict:
 # ---------- Static ----------
 BASE = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
+
+# ---------- Attention (voice PA broadcast) ----------
+RECORDINGS_DIR = os.path.join(BASE, "recordings")
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
+# Served over plain HTTP so Sonos speakers can fetch the clip to play.
+app.mount("/recordings", StaticFiles(directory=RECORDINGS_DIR), name="recordings")
+
+
+def _safe_label(s: str) -> str:
+    """Filesystem-safe device label for filenames."""
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", s).strip("-")[:40] or "device"
+
+
+async def _broadcast_clip(fname: str, volume: int) -> dict:
+    """Fire an audioClip of recordings/<fname> at every speaker, at the given volume."""
+    lan_ip = get_local_ip()
+    if not lan_ip:
+        raise HTTPException(503, "cannot determine LAN IP for broadcast")
+    stream_url = f"http://{lan_ip}:{PUBLIC_HTTP_PORT}/recordings/{fname}"
+    played = 0
+    failed: list[str] = []
+    async with httpx.AsyncClient(verify=False) as client:
+        async def one(uuid: str, dev: dict) -> None:
+            nonlocal played
+            try:
+                await play_audio_clip(client, dev["ip"], uuid, stream_url, volume)
+                played += 1
+            except Exception as e:
+                failed.append(dev.get("name", uuid))
+                _log.warning("audioClip to %s failed: %s", dev.get("name", uuid), str(e)[:120])
+        await asyncio.gather(*(one(u, d) for u, d in STATE.devices.items()))
+    return {"played": played, "failed": failed, "url": stream_url}
+
+
+@app.post("/attention/upload")
+async def attention_upload(request: Request) -> dict:
+    """Receive a raw WAV body, store it named by date/time/IP/device, then broadcast to all."""
+    data = await request.body()
+    if not data:
+        raise HTTPException(400, "empty upload")
+    if len(data) > MAX_RECORDING_BYTES:
+        raise HTTPException(413, "recording too large")
+    device_name = _safe_label(urllib.parse.unquote(request.headers.get("X-Device-Name", "device")))
+    try:
+        volume = int(request.headers.get("X-Clip-Volume", "45"))
+    except ValueError:
+        volume = 45
+    client_ip = (request.client.host if request.client else "0.0.0.0").replace(".", "-").replace(":", "-")
+    ts = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    fname = f"{ts}_{client_ip}_{device_name}.wav"
+    with open(os.path.join(RECORDINGS_DIR, fname), "wb") as f:
+        f.write(data)
+    _log.info("Attention recording saved: %s (%d bytes)", fname, len(data))
+    result = await _broadcast_clip(fname, volume)
+    return {"ok": True, "file": fname, **result}
+
+
+@app.get("/attention/list")
+async def attention_list() -> dict:
+    items = []
+    for name in os.listdir(RECORDINGS_DIR):
+        if not name.endswith(".wav"):
+            continue
+        try:
+            st = os.stat(os.path.join(RECORDINGS_DIR, name))
+        except OSError:
+            continue
+        items.append({"name": name, "size": st.st_size, "mtime": st.st_mtime, "url": f"/recordings/{name}"})
+    items.sort(key=lambda x: x["mtime"], reverse=True)
+    return {"recordings": items}
+
+
+class AttentionBroadcastReq(BaseModel):
+    file: str
+    volume: int = 45
+
+
+@app.post("/attention/broadcast")
+async def attention_broadcast(req: AttentionBroadcastReq) -> dict:
+    fname = os.path.basename(req.file)
+    if not fname.endswith(".wav") or not os.path.exists(os.path.join(RECORDINGS_DIR, fname)):
+        raise HTTPException(404, "recording not found")
+    result = await _broadcast_clip(fname, req.volume)
+    return {"ok": True, "file": fname, **result}
+
+
+@app.delete("/attention/{name}")
+async def attention_delete(name: str) -> dict:
+    fname = os.path.basename(name)
+    path = os.path.join(RECORDINGS_DIR, fname)
+    if not fname.endswith(".wav") or not os.path.exists(path):
+        raise HTTPException(404, "recording not found")
+    os.remove(path)
+    _log.info("Attention recording deleted: %s", fname)
+    return {"ok": True}
 
 
 @app.get("/")
