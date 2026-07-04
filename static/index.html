@@ -350,7 +350,7 @@
     padding: 4px 8px;
     border: 1px solid var(--ink);
     border-radius: 3px;
-    min-width: 46px;
+    width: 46px;
     text-align: center;
     text-shadow: 0 0 6px rgba(255,180,50,0.75);
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.7);
@@ -364,7 +364,7 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 18px;
   }
-  @media (max-width: 900px) {
+  @media (max-width: 560px) {
     .grid { grid-template-columns: repeat(2, 1fr); }
   }
 
@@ -374,7 +374,7 @@
       linear-gradient(180deg, #6b3b1c 0%, #3d2110 100%);
     border: 2px solid var(--ink);
     border-radius: 12px;
-    padding: 24px 14px 20px;
+    padding: 20px 8px 16px;
     position: relative;
     box-shadow:
       inset 0 1px 0 rgba(255,220,170,0.20),
@@ -382,7 +382,7 @@
       0 8px 22px rgba(0,0,0,0.55);
     text-align: center;
     transition: box-shadow 0.15s;
-    min-height: 400px;
+    min-height: 340px;
     display: flex; flex-direction: column; align-items: center;
   }
   .card.playing {
@@ -584,10 +584,10 @@
     font-family: "Courier New", monospace;
     font-size: 22px;
     letter-spacing: 0.15em;
-    padding: 6px 14px;
+    padding: 6px 0;
     border: 1px solid var(--ink);
     border-radius: 3px;
-    min-width: 68px;
+    width: 68px;
     text-align: center;
     text-shadow: 0 0 6px rgba(255,180,50,0.75);
     box-shadow: inset 0 1px 2px rgba(0,0,0,0.7), 0 0 8px rgba(255,140,40,0.15);
@@ -658,6 +658,19 @@
     display: none;
   }
   .error-bar.show { display: block; }
+
+  /* --- Mobile --- */
+  @media (max-width: 640px) {
+    body { padding: 14px 12px 40px; }
+    .now {
+      grid-template-columns: 1fr;
+    }
+    .group-panel {
+      width: 100%;
+      justify-self: stretch;
+    }
+    .now .title { font-size: 18px; }
+  }
 </style>
 </head>
 <body>
@@ -899,7 +912,6 @@
           <div class="badges">
             <span class="badge state ${stateCls}"><span class="dot"></span>${escapeHTML(stateLabel)}</span>
             <span class="badge source">${escapeHTML(source)}</span>
-            <span class="badge device">via ${escapeHTML(coord?.name || '?')}</span>
             <span class="badge">${memberCount} speaker${memberCount === 1 ? '' : 's'}</span>
           </div>
           ${memberCount > 1 ? `<div class="session-line">Group · ${escapeHTML(memberChips)}</div>` : ''}
