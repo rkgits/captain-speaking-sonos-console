@@ -7,12 +7,12 @@ ENV="${1:-staging}"
 
 case "$ENV" in
   staging)
-    DEPLOY_DIR="$HOME/sonos-app-staging"
+    DEPLOY_DIR="$HOME/sonos/staging"
     LAUNCHAGENT="com.sonos-app-staging"
     PORT=8788
     ;;
   production)
-    DEPLOY_DIR="$HOME/sonos-app"
+    DEPLOY_DIR="$HOME/sonos/production"
     LAUNCHAGENT="com.sonos-app"
     PORT=8787
     ;;
@@ -23,7 +23,7 @@ case "$ENV" in
 esac
 
 RUNNER_WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
-RELEASES_DIR="$HOME/sonos-releases/$ENV"
+RELEASES_DIR="$HOME/sonos/releases/$ENV"
 
 echo "==> Deploying to $ENV ($DEPLOY_DIR, port $PORT)"
 
