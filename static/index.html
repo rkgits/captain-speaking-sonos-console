@@ -724,8 +724,9 @@
   let progressRef = null;
   // master group volume: local override during drag
   let masterLocal = { until: 0, value: null };
-  // true while a transport SOAP command is in flight — blocks all transport buttons
+  // true while a transport command is in flight OR settling — blocks all transport buttons
   let _transportInFlight = false;
+  let _transportCooldownTimer = null;
 
   // ---- Peer prediction helpers ----
   function currentSpeakerVolume(uuid) {
@@ -1152,31 +1153,42 @@
   // ---- Transport buttons ----
   function attachTransport(coord) {
     for (const btn of nowWrap.querySelectorAll('.t-btn')) {
+      // If a command is still cooling down, keep new buttons disabled too
+      if (_transportInFlight) btn.disabled = true;
+
       btn.addEventListener('click', async () => {
-        // Block if another command is already in flight (prevents double-tap
-        // on pause/play from sending two SOAP commands which breaks AirPlay)
         if (_transportInFlight) return;
         const a = btn.dataset.tAction;
+
+        // How long to keep buttons locked after the API response comes back.
+        // play/pause: 2.5s — gives Sonos and AirPlay time to fully settle
+        //             before the user can send another command.
+        // next/prev:  600ms — just long enough to see the new track title.
+        const settleMs = (a === 'play' || a === 'pause') ? 2500 : 600;
+
         _transportInFlight = true;
-        // Disable every transport button immediately — not just the clicked one
         for (const b of nowWrap.querySelectorAll('.t-btn')) b.disabled = true;
-        try {
-          const result = await apiPost('/' + a, {coordinator_uuid: coord});
-          if (result?._error) {
-            errorBar.classList.add('show');
-            errorBar.textContent = result._error;
-          } else if (result?.transport) {
-            latest.transport[coord] = result.transport;
-          }
-        } finally {
-          _transportInFlight = false;
-          // render() replaces nowWrap.innerHTML with fresh enabled buttons AND
-          // updates the state badge immediately so the user sees the new state.
-          // Old disabled buttons become detached — no stale state possible.
-          if (!activeDrag) render();
-          else for (const b of nowWrap.querySelectorAll('.t-btn')) b.disabled = false;
-          setTimeout(refresh, 1500);
+
+        const result = await apiPost('/' + a, {coordinator_uuid: coord});
+
+        if (result?._error) {
+          errorBar.classList.add('show');
+          errorBar.textContent = result._error;
+        } else if (result?.transport) {
+          latest.transport[coord] = result.transport;
         }
+
+        // Re-render immediately so the state badge updates (e.g. Playing → Paused).
+        // Buttons remain disabled because _transportInFlight is still true —
+        // attachTransport() applies btn.disabled = true to every new button it creates.
+        if (!activeDrag) render();
+
+        // After the settle window, unlock and do a confirming refresh
+        clearTimeout(_transportCooldownTimer);
+        _transportCooldownTimer = setTimeout(() => {
+          _transportInFlight = false;
+          refresh();  // fetches confirmed state and renders with fresh enabled buttons
+        }, result?._error ? 300 : settleMs);
       });
     }
   }
