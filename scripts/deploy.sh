@@ -78,10 +78,17 @@ echo "[\$(date)] Starting $ENV server (HTTP $PORT + HTTPS $HTTPS_PORT)..." >> $D
 export PUBLIC_HTTP_PORT=$PORT
 export HTTPS_PORT=$HTTPS_PORT
 /usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT >> $DEPLOY_DIR/server.log 2>&1 &
+HTTP_PID=\$!
 /usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $HTTPS_PORT \\
   --ssl-keyfile $DEPLOY_DIR/certs/key.pem --ssl-certfile $DEPLOY_DIR/certs/cert.pem >> $DEPLOY_DIR/server.log 2>&1 &
-wait -n
-kill 0
+HTTPS_PID=\$!
+# Supervise both listeners (bash 3.2 has no 'wait -n'): if either dies, kill the
+# other and exit so launchd's KeepAlive restarts the pair.
+while kill -0 \$HTTP_PID 2>/dev/null && kill -0 \$HTTPS_PID 2>/dev/null; do
+  sleep 5
+done
+kill \$HTTP_PID \$HTTPS_PID 2>/dev/null
+exit 1
 SCRIPT
 chmod +x "$DEPLOY_DIR/run_server.sh"
 
