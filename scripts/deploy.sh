@@ -35,7 +35,16 @@ rsync -a --delete \
   --exclude='.pytest_cache/' \
   "$RUNNER_WORKSPACE/" "$DEPLOY_DIR/"
 
-# 2. Rebuild venv if requirements changed
+# 2. Recreate run_server.sh (env-specific, not in git)
+cat > "$DEPLOY_DIR/run_server.sh" << SCRIPT
+#!/bin/bash
+cd $DEPLOY_DIR
+echo "[\$(date)] Starting $ENV server..." >> $DEPLOY_DIR/server.log 2>&1
+exec /usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT
+SCRIPT
+chmod +x "$DEPLOY_DIR/run_server.sh"
+
+# 3. Rebuild venv if requirements changed
 VENV="$DEPLOY_DIR/.venv"
 REQ_HASH_FILE="$DEPLOY_DIR/.req_hash"
 REQ_HASH=$(sha256sum "$DEPLOY_DIR/requirements.txt" | awk '{print $1}')
@@ -47,12 +56,12 @@ if [ ! -d "$VENV" ] || [ "$(cat "$REQ_HASH_FILE" 2>/dev/null)" != "$REQ_HASH" ];
   echo "$REQ_HASH" > "$REQ_HASH_FILE"
 fi
 
-# 3. Restart the server
+# 4. Restart the server
 echo "==> Restarting $LAUNCHAGENT"
 launchctl kickstart -k "gui/$(id -u)/$LAUNCHAGENT" 2>/dev/null || \
   launchctl start "gui/$(id -u)/$LAUNCHAGENT" 2>/dev/null || true
 
-# Wait for server to come up
+# 5. Wait for server to come up
 echo "==> Waiting for server on port $PORT..."
 for i in $(seq 1 15); do
   if curl -sf "http://localhost:$PORT/state" > /dev/null 2>&1; then
@@ -62,7 +71,7 @@ for i in $(seq 1 15); do
   sleep 1
 done
 
-# 4. On staging: run the test suite
+# 6. On staging: run the test suite
 if [ "$ENV" = "staging" ]; then
   echo "==> Running tests against staging (port $PORT)"
   TEST_URL="http://localhost:$PORT" \
