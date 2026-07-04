@@ -8,3 +8,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+recordings/
+certs/
+run_server.sh
+.req_hash
