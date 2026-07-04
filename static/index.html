@@ -1161,7 +1161,18 @@
             setTimeout(refresh, 500);
           } else if (result?.transport) {
             latest.transport[coord] = result.transport;
-            if (!activeDrag) render();
+            if (a === 'play' || a === 'pause') {
+              // Toggle button in-place — full re-render would replace the DOM
+              // and new buttons can lose their handlers in certain timing scenarios.
+              const newState = result.transport.state;
+              const nowPlaying = newState === 'PLAYING';
+              btn.dataset.tAction = nowPlaying ? 'pause' : 'play';
+              btn.title = nowPlaying ? 'pause' : 'play';
+              btn.textContent = nowPlaying ? '❚❚' : '▶';
+            } else if (!activeDrag) {
+              // next/prev: full render to show new track title immediately
+              render();
+            }
           }
         } finally {
           btn.disabled = false;
