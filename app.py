@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import subprocess
+import wave
 from typing import Any
 
 import urllib.parse
@@ -690,6 +691,22 @@ def _safe_label(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "-", s).strip("-")[:40] or "device"
 
 
+def _wav_duration(path: str) -> float:
+    """Length of a WAV file in seconds (0 if unreadable)."""
+    try:
+        with wave.open(path, "rb") as w:
+            rate = w.getframerate()
+            return w.getnframes() / rate if rate else 0.0
+    except Exception:
+        return 0.0
+
+
+def _fmt_duration(secs: float) -> str:
+    """Seconds -> m:ss (or 0:ss)."""
+    total = int(round(secs))
+    return f"{total // 60}:{total % 60:02d}"
+
+
 async def _broadcast_url(client, players: list, stream_url: str, volume: int) -> tuple[int, list[str]]:
     """Fire one audioClip (stream_url) at every player. Returns (played, failed-names)."""
     played = 0
@@ -755,7 +772,8 @@ async def attention_list() -> dict:
             st = os.stat(os.path.join(RECORDINGS_DIR, name))
         except OSError:
             continue
-        items.append({"name": name, "size": st.st_size, "mtime": st.st_mtime, "url": f"/recordings/{name}"})
+        dur = _wav_duration(os.path.join(RECORDINGS_DIR, name))
+        items.append({"name": name, "size": st.st_size, "mtime": st.st_mtime, "duration": dur, "url": f"/recordings/{name}"})
     items.sort(key=lambda x: x["mtime"], reverse=True)
     return {"recordings": items}
 
@@ -839,17 +857,19 @@ async def dashboard():
             rst = os.stat(os.path.join(RECORDINGS_DIR, rn))
         except OSError:
             continue
-        recs.append((rn, rst.st_mtime, rst.st_size))
+        dur = _wav_duration(os.path.join(RECORDINGS_DIR, rn))
+        recs.append((rn, rst.st_mtime, rst.st_size, dur))
     recs.sort(key=lambda x: x[1], reverse=True)
 
     announce_rows = ""
-    for rn, mtime, size in recs:
+    for rn, mtime, size, dur in recs:
         when = datetime.datetime.fromtimestamp(mtime).strftime("%b %d · %H:%M:%S")
         device = rn[:-4].split("_")[-1] or "device"  # filenames are safe-labeled
         announce_rows += (
             '<div class="rec-item">'
             f'<span class="rtime">{html.escape(when)}</span>'
             f'<span class="rdev">📣 {html.escape(device)}</span>'
+            f'<span class="rdur">{_fmt_duration(dur)}</span>'
             f'<span class="rsize">{_fmt_size(size)}</span>'
             '<span class="racts">'
             f'<button class="dbtn cast" onclick="rebroadcast(this,\'{rn}\')">▶ Broadcast</button>'
@@ -870,6 +890,7 @@ async def dashboard():
         ".rec-item:hover{background:#161b22;}"
         ".rtime{color:#8ab4f8;white-space:nowrap;width:150px;}"
         ".rdev{flex:1;color:#c9d1d9;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+        ".rdur{color:#9d8bd6;width:52px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}"
         ".rsize{color:#666;width:70px;text-align:right;white-space:nowrap;}"
         ".racts{display:flex;gap:6px;flex:none;}"
         ".dbtn{font-family:inherit;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 10px;"
