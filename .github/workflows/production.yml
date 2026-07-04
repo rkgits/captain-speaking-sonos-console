@@ -8,6 +8,7 @@ jobs:
   deploy-production:
     name: Deploy (Production)
     runs-on: self-hosted
+    environment: production    # pauses here until manually approved on GitHub
 
     steps:
       - name: Checkout code
