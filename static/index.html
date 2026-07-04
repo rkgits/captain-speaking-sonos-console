@@ -801,9 +801,17 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
       });
-      if (!r.ok) throw new Error(await r.text());
+      if (!r.ok) {
+        let detail = `HTTP ${r.status}`;
+        try { const d = await r.json(); detail = d.detail || detail; } catch (_) {}
+        console.error('POST', path, detail);
+        return { _error: detail };
+      }
       return await r.json();
-    } catch (e) { console.error('POST', path, e); }
+    } catch (e) {
+      console.error('POST', path, e);
+      return { _error: e.message || 'Network error' };
+    }
   }
 
   async function refresh() {
@@ -1145,13 +1153,20 @@
       btn.addEventListener('click', async () => {
         const a = btn.dataset.tAction;
         btn.disabled = true;
-        const result = await apiPost('/' + a, {coordinator_uuid: coord});
-        if (result?.transport) {
-          latest.transport[coord] = result.transport;
-          if (!activeDrag) render();
+        try {
+          const result = await apiPost('/' + a, {coordinator_uuid: coord});
+          if (result?._error) {
+            errorBar.classList.add('show');
+            errorBar.textContent = result._error;
+            setTimeout(refresh, 500);
+          } else if (result?.transport) {
+            latest.transport[coord] = result.transport;
+            if (!activeDrag) render();
+          }
+        } finally {
+          btn.disabled = false;
+          setTimeout(refresh, 1500);
         }
-        btn.disabled = false;
-        setTimeout(refresh, 1500);
       });
     }
   }
