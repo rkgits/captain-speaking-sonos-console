@@ -688,6 +688,126 @@
     }
     .now .title { font-size: 18px; }
   }
+
+  /* ===== Attention tab ===== */
+  .tabs {
+    max-width: 1200px; margin: 0 auto 22px;
+    display: flex; gap: 6px; justify-content: center;
+  }
+  .tab {
+    font-family: "Courier New", monospace;
+    font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase;
+    padding: 9px 22px; cursor: pointer;
+    color: var(--parchment);
+    background: linear-gradient(180deg, #3a2211, #241207);
+    border: 1px solid var(--ink); border-bottom: none;
+    border-radius: 7px 7px 0 0;
+    box-shadow: inset 0 1px 0 rgba(255,200,140,0.08);
+    opacity: 0.7; user-select: none;
+  }
+  .tab:hover { opacity: 1; }
+  .tab.active {
+    color: var(--ink); opacity: 1;
+    background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid) 70%, var(--brass-lo));
+    box-shadow: inset 0 1px 0 rgba(255,240,180,0.7), 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .view[hidden] { display: none; }
+
+  .att {
+    max-width: 1200px; margin: 0 auto;
+    background:
+      radial-gradient(ellipse at 15% 0%, rgba(255,180,90,0.15), transparent 60%),
+      linear-gradient(180deg, #5c3520, #2b1608);
+    border: 2px solid var(--ink); border-radius: 12px;
+    padding: 0 0 26px; position: relative; overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255,200,140,0.15), inset 0 -3px 6px rgba(0,0,0,0.35), 0 6px 20px rgba(0,0,0,0.5);
+  }
+  .att .screw.tl { top: 10px; left: 10px; } .att .screw.tr { top: 10px; right: 10px; }
+  .att .screw.bl { bottom: 10px; left: 10px; } .att .screw.br { bottom: 10px; right: 10px; }
+
+  .hero { position: relative; height: 260px; overflow: hidden; border-bottom: 2px solid var(--ink); }
+  .hero img { width: 100%; height: 100%; object-fit: cover; object-position: center 30%; display: block; filter: saturate(1.05) contrast(1.02); }
+  .hero .placeholder {
+    width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;
+    background: repeating-linear-gradient(45deg, rgba(0,0,0,0.25) 0 18px, rgba(0,0,0,0.12) 18px 36px), linear-gradient(135deg, #6b3b1c, #2b1608);
+    color: var(--parchment); font-style: italic; letter-spacing: 0.1em; padding: 20px;
+  }
+  .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 30%, transparent 55%, rgba(20,10,5,0.85) 100%); }
+  .hero .placard { position: absolute; left: 0; right: 0; bottom: 16px; text-align: center; z-index: 2; }
+  .hero .placard .ttl { display: inline-block; font-size: 30px; font-weight: bold; letter-spacing: 0.35em;
+    color: var(--brass-hi); text-shadow: 0 2px 0 rgba(0,0,0,0.6), 0 0 18px rgba(246,220,131,0.55); }
+  .hero .placard .tag { display: block; margin-top: 6px; font-family: "Courier New", monospace;
+    font-size: 10px; letter-spacing: 0.5em; color: var(--cream); opacity: 0.85; text-transform: uppercase; }
+  .fasten { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 2;
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 4px;
+    background: linear-gradient(180deg, #7a1f14, #4a0f09); border: 1px solid #2a0805;
+    color: #ffd9b0; font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.3em;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .fasten .led { width: 8px; height: 8px; border-radius: 50%; background: var(--led-red);
+    box-shadow: 0 0 8px var(--led-red); animation: att-blink 1.1s steps(1) infinite; }
+  @keyframes att-blink { 50% { opacity: 0.25; } }
+
+  .att-body { padding: 24px 30px 0; }
+  .att-row { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
+  .att-col { flex: 1 1 340px; min-width: 300px; }
+  .field-label { font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.28em;
+    text-transform: uppercase; color: var(--brass-mid); margin-bottom: 8px; display: block; }
+  .device-chip { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 20px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(195,154,58,0.4); color: var(--cream); font-size: 13px; margin-bottom: 20px; }
+  .device-chip button { background: none; border: none; color: var(--brass-mid); cursor: pointer;
+    font-size: 11px; text-decoration: underline; font-family: inherit; }
+  .vol-wrap { margin-bottom: 22px; }
+  .vol-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .vol-head .val { font-size: 22px; color: var(--brass-hi); font-weight: bold; }
+  .att input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px;
+    background: linear-gradient(90deg, var(--brass-mid), var(--brass-hi)); outline: none; border: 1px solid var(--ink);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5); }
+  .att input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff2b8, #c39a3a 60%, #6b4a08); border: 2px solid var(--ink); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+  .recorder { text-align: center; padding: 8px 0 6px; }
+  .rec-btn { width: 128px; height: 128px; border-radius: 50%; cursor: pointer; position: relative; border: 4px solid var(--ink);
+    background: radial-gradient(circle at 38% 32%, #ff7a6e, var(--led-red) 55%, #8a1a12);
+    box-shadow: 0 0 0 6px rgba(0,0,0,0.25), 0 8px 22px rgba(0,0,0,0.55), inset 0 2px 6px rgba(255,255,255,0.3);
+    color: #fff; display: inline-flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+  .rec-btn:active { transform: scale(0.97); }
+  .rec-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .rec-btn .mic { font-size: 46px; line-height: 1; }
+  .rec-btn.recording { background: radial-gradient(circle at 38% 32%, #555, #2a2a2a 60%, #111); animation: att-pulse 1.4s ease-in-out infinite; }
+  @keyframes att-pulse { 0%,100% { box-shadow: 0 0 0 6px rgba(255,74,61,0.15), 0 8px 22px rgba(0,0,0,0.55);} 50% { box-shadow: 0 0 0 14px rgba(255,74,61,0.30), 0 8px 22px rgba(0,0,0,0.55);} }
+  .rec-ring { position: absolute; inset: -14px; border-radius: 50%; pointer-events: none;
+    background: conic-gradient(var(--brass-hi) var(--pct, 0%), transparent 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+            mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+    opacity: 0; transition: opacity 0.2s; }
+  .rec-btn.recording .rec-ring { opacity: 1; }
+  .countdown { margin-top: 16px; font-size: 40px; font-family: "Courier New", monospace; color: var(--cream); letter-spacing: 0.05em; }
+  .countdown .max { font-size: 15px; color: var(--parchment); opacity: 0.6; }
+  .hint { margin-top: 6px; font-size: 12px; color: var(--parchment); font-style: italic; opacity: 0.8; }
+  .meter { display: flex; gap: 4px; justify-content: center; align-items: flex-end; height: 54px; margin-top: 18px; }
+  .meter .bar { width: 7px; height: 6px; border-radius: 2px; background: linear-gradient(180deg, var(--led-green), #1f7a3c);
+    box-shadow: 0 0 4px rgba(69,224,122,0.4); transition: height 0.06s linear; }
+  .att-status { text-align: center; margin-top: 18px; min-height: 22px; font-family: "Courier New", monospace;
+    font-size: 12px; letter-spacing: 0.15em; color: var(--led-amber); }
+  .secure-note { margin: 8px 30px 0; padding: 14px 18px; border-radius: 8px; text-align: center;
+    background: rgba(255,184,74,0.12); border: 1px solid var(--led-amber); color: var(--cream); font-size: 13px; }
+  .secure-note a { color: var(--brass-hi); font-weight: bold; }
+  .lib { margin: 26px 30px 0; border-top: 1px solid rgba(195,154,58,0.3); padding-top: 20px; }
+  .lib h3 { font-family: "Courier New", monospace; font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--brass-mid); margin-bottom: 14px; }
+  .rec-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; margin-bottom: 9px;
+    background: rgba(0,0,0,0.28); border: 1px solid var(--ink); border-radius: 8px; }
+  .rec-row .play { width: 38px; height: 38px; flex: none; border-radius: 50%; cursor: pointer;
+    background: radial-gradient(circle at 35% 30%, #fff2b8, #c39a3a 60%, #6b4a08); border: 2px solid var(--ink); color: var(--ink);
+    font-size: 15px; display: flex; align-items: center; justify-content: center; }
+  .rec-row .meta { flex: 1; min-width: 0; }
+  .rec-row .fname { font-size: 13px; color: var(--cream); word-break: break-all; }
+  .rec-row .rsub { font-size: 11px; color: var(--parchment); opacity: 0.7; margin-top: 2px; }
+  .rec-row .acts { display: flex; gap: 8px; flex: none; }
+  .mini { font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+    padding: 7px 12px; border-radius: 5px; cursor: pointer; border: 1px solid var(--ink); color: var(--ink); }
+  .mini.broadcast { background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid)); }
+  .mini.del { background: linear-gradient(180deg, #d98a7a, #a3402f); color: #fff; }
+  .lib-empty { color: var(--parchment); opacity: 0.6; font-style: italic; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -702,11 +822,75 @@
     <div class="sub">Vintage Series · Model MMXXVI</div>
   </div>
 
+  <div class="tabs">
+    <div class="tab active" data-tab="console">Console</div>
+    <div class="tab" data-tab="attention">Attention</div>
+  </div>
+
   <div id="error-bar" class="error-bar"></div>
 
-  <div class="now-wrap" id="now-wrap"></div>
+  <div class="view" id="view-console">
+    <div class="now-wrap" id="now-wrap"></div>
+    <div class="grid" id="grid"></div>
+  </div>
 
-  <div class="grid" id="grid"></div>
+  <div class="view" id="view-attention" hidden>
+    <div class="att">
+      <div class="screw tl"></div><div class="screw tr"></div>
+      <div class="screw bl"></div><div class="screw br"></div>
+
+      <div class="hero">
+        <div class="fasten"><span class="led"></span> FASTEN SEATBELTS</div>
+        <img id="att-hero" alt="" />
+        <div class="placeholder" id="att-hero-ph" hidden>✈︎ add static/attention.jpg for the hero image</div>
+        <div class="placard">
+          <span class="ttl">ATTENTION&nbsp;ATTENTION!</span>
+          <span class="tag">this is your captain speaking</span>
+        </div>
+      </div>
+
+      <div id="att-secure-note" class="secure-note" hidden></div>
+
+      <div class="att-body" id="att-controls">
+        <div class="att-row">
+          <div class="att-col">
+            <span class="field-label">Broadcasting as</span>
+            <div class="device-chip">
+              <span>📱</span><span id="att-device">device</span>
+              <button id="att-rename">rename</button>
+            </div>
+            <div class="vol-wrap">
+              <span class="field-label">Announcement volume</span>
+              <div class="vol-head">
+                <span style="font-size:12px;color:var(--parchment);">soft&nbsp;·&nbsp;loud</span>
+                <span class="val" id="att-vol-val">45</span>
+              </div>
+              <input type="range" id="att-vol" min="0" max="100" value="45" />
+              <div class="hint" style="margin-top:8px;">Set before recording — it broadcasts to all speakers the moment you stop.</div>
+            </div>
+          </div>
+          <div class="att-col">
+            <div class="recorder">
+              <button class="rec-btn" id="att-rec">
+                <span class="rec-ring" id="att-ring"></span>
+                <span class="mic" id="att-icon">🎙️</span>
+              </button>
+              <div class="countdown"><span id="att-cd">60</span><span class="max">&nbsp;/ 60s</span></div>
+              <div class="hint" id="att-hint">Tap to record — max 60 seconds</div>
+              <div class="meter" id="att-meter"></div>
+              <div class="att-status" id="att-status"></div>
+            </div>
+          </div>
+        </div>
+        <audio id="att-player" style="display:none"></audio>
+      </div>
+
+      <div class="lib">
+        <h3>✈ Flight Log — recent announcements</h3>
+        <div id="att-lib"></div>
+      </div>
+    </div>
+  </div>
 
 <script>
 (() => {
@@ -1305,6 +1489,206 @@
     };
   }
   connectSSE();
+
+  // ===================== Attention tab =====================
+  (function initAttention() {
+    const AMBER = 'var(--led-amber)', GREEN = 'var(--led-green)', RED = 'var(--led-red)';
+    const tabs = document.querySelectorAll('.tab');
+    const views = { console: $('view-console'), attention: $('view-attention') };
+    let libLoaded = false;
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.classList.toggle('active', x === t));
+      for (const k in views) views[k].hidden = (k !== t.dataset.tab);
+      if (t.dataset.tab === 'attention' && !libLoaded) { libLoaded = true; loadLibrary(); }
+    }));
+
+    // Hero image with graceful fallback
+    const hero = $('att-hero'), heroPh = $('att-hero-ph');
+    hero.onerror = () => { hero.style.display = 'none'; heroPh.hidden = false; };
+    hero.src = '/static/attention.jpg';
+
+    // Device name (ask once, localStorage)
+    function guessDevice() {
+      const ua = navigator.userAgent;
+      if (/iPhone/.test(ua)) return 'iPhone';
+      if (/iPad/.test(ua)) return 'iPad';
+      if (/Android/.test(ua)) return 'Android';
+      if (/Macintosh/.test(ua)) return 'Mac';
+      if (/Windows/.test(ua)) return 'Windows';
+      return 'device';
+    }
+    const devEl = $('att-device');
+    let deviceName = localStorage.getItem('att_device_name') || guessDevice();
+    devEl.textContent = deviceName;
+    $('att-rename').addEventListener('click', () => {
+      const v = prompt('Name this device (appears in the recording filename):', deviceName);
+      if (v && v.trim()) { deviceName = v.trim(); devEl.textContent = deviceName; localStorage.setItem('att_device_name', deviceName); }
+    });
+
+    // Volume
+    const volSlider = $('att-vol'), volVal = $('att-vol-val');
+    volSlider.addEventListener('input', () => volVal.textContent = volSlider.value);
+
+    // Meter bars
+    const meter = $('att-meter'), BARS = 24, bars = [];
+    for (let i = 0; i < BARS; i++) { const b = document.createElement('div'); b.className = 'bar'; meter.appendChild(b); bars.push(b); }
+
+    const recBtn = $('att-rec'), recIcon = $('att-icon'), recRing = $('att-ring');
+    const cdEl = $('att-cd'), statusEl = $('att-status'), hintEl = $('att-hint'), player = $('att-player');
+    function status(msg, color) { statusEl.textContent = msg; statusEl.style.color = color || AMBER; }
+
+    const MAX = 60;
+    let recording = false, stream = null, audioCtx = null, analyser = null, procNode = null, srcNode = null;
+    let rafId = null, tickId = null, startTs = 0, chunks = [], sampleRate = 44100;
+
+    function drawMeter() {
+      if (analyser) {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const step = Math.max(1, Math.floor(data.length / BARS));
+        for (let i = 0; i < BARS; i++) {
+          const v = data[i * step] / 255;
+          bars[i].style.height = (6 + v * 46) + 'px';
+          bars[i].style.background = v > 0.75 ? 'linear-gradient(180deg,var(--led-red),#7a1f14)'
+            : v > 0.5 ? 'linear-gradient(180deg,var(--led-amber),#a56a10)'
+                      : 'linear-gradient(180deg,var(--led-green),#1f7a3c)';
+        }
+      }
+      rafId = requestAnimationFrame(drawMeter);
+    }
+    function resetMeter() { cancelAnimationFrame(rafId); rafId = null; bars.forEach(b => b.style.height = '6px'); }
+
+    async function startRec() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        status('✗ mic blocked — allow microphone access', RED);
+        return;
+      }
+      recording = true; chunks = []; startTs = Date.now();
+      recBtn.classList.add('recording'); recIcon.textContent = '⏹';
+      hintEl.textContent = 'Recording… tap to stop';
+      status('● REC', RED);
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      sampleRate = audioCtx.sampleRate;
+      srcNode = audioCtx.createMediaStreamSource(stream);
+      analyser = audioCtx.createAnalyser(); analyser.fftSize = 128; srcNode.connect(analyser);
+      procNode = audioCtx.createScriptProcessor(4096, 1, 1);
+      procNode.onaudioprocess = (e) => { if (recording) chunks.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
+      srcNode.connect(procNode); procNode.connect(audioCtx.destination);
+      drawMeter();
+      tickId = setInterval(() => {
+        const left = MAX - Math.floor((Date.now() - startTs) / 1000);
+        cdEl.textContent = Math.max(0, left);
+        recRing.style.setProperty('--pct', ((MAX - left) / MAX * 100) + '%');
+        if (left <= 0) stopRec();
+      }, 200);
+    }
+
+    function stopRec() {
+      if (!recording) return;
+      recording = false;
+      clearInterval(tickId); tickId = null;
+      recBtn.classList.remove('recording'); recIcon.textContent = '🎙️';
+      hintEl.textContent = 'Tap to record — max 60 seconds';
+      recRing.style.setProperty('--pct', '0%');
+      resetMeter();
+      try { if (procNode) { procNode.disconnect(); procNode.onaudioprocess = null; } if (srcNode) srcNode.disconnect(); } catch (_) {}
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      analyser = null; cdEl.textContent = '60';
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const samples = new Float32Array(total);
+      let off = 0; for (const c of chunks) { samples.set(c, off); off += c.length; }
+      if (audioCtx) audioCtx.close();
+      if (total < sampleRate * 0.3) { status('✗ too short — hold to record', RED); return; }
+      const blob = encodeWAV(samples, sampleRate);
+      player.src = URL.createObjectURL(blob); player.style.display = 'block'; player.controls = true;
+      uploadAndBroadcast(blob);
+    }
+
+    function encodeWAV(samples, rate) {
+      const buf = new ArrayBuffer(44 + samples.length * 2);
+      const view = new DataView(buf);
+      const ws = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+      ws(0, 'RIFF'); view.setUint32(4, 36 + samples.length * 2, true); ws(8, 'WAVE');
+      ws(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+      view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+      ws(36, 'data'); view.setUint32(40, samples.length * 2, true);
+      let o = 44; for (let i = 0; i < samples.length; i++, o += 2) { const s = Math.max(-1, Math.min(1, samples[i])); view.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true); }
+      return new Blob([view], { type: 'audio/wav' });
+    }
+
+    async function uploadAndBroadcast(blob) {
+      status('📢 broadcasting to all speakers…', AMBER);
+      try {
+        const r = await fetch(API_BASE + '/attention/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'audio/wav', 'X-Device-Name': encodeURIComponent(deviceName), 'X-Clip-Volume': String(volSlider.value) },
+          body: blob,
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) { status('✗ ' + (d.detail || ('HTTP ' + r.status)), RED); return; }
+        const failN = (d.failed || []).length;
+        status(failN ? `✓ played on ${d.played}, ${failN} failed — stream resumed` : `✓ played on all ${d.played} speakers — stream resumed`, GREEN);
+        loadLibrary();
+      } catch (e) { status('✗ ' + (e.message || 'upload failed'), RED); }
+    }
+
+    recBtn.addEventListener('click', () => recording ? stopRec() : startRec());
+
+    // Library
+    const libEl = $('att-lib');
+    async function loadLibrary() {
+      try {
+        const r = await fetch(API_BASE + '/attention/list');
+        const d = await r.json();
+        renderLibrary(d.recordings || []);
+      } catch (_) {}
+    }
+    function fmtBytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB'; }
+    function renderLibrary(recs) {
+      libEl.innerHTML = '';
+      if (!recs.length) { libEl.innerHTML = '<div class="lib-empty">No announcements yet — record one above.</div>'; return; }
+      for (const rec of recs) {
+        const row = document.createElement('div');
+        row.className = 'rec-row';
+        const when = new Date(rec.mtime * 1000).toLocaleString();
+        row.innerHTML = `
+          <div class="play">▶</div>
+          <div class="meta"><div class="fname"></div><div class="rsub">${when} · ${fmtBytes(rec.size)}</div></div>
+          <div class="acts"><button class="mini broadcast">📢 Broadcast</button><button class="mini del">Delete</button></div>`;
+        row.querySelector('.fname').textContent = rec.name;
+        row.querySelector('.play').addEventListener('click', () => { player.src = API_BASE + rec.url; player.style.display = 'block'; player.controls = true; player.play().catch(() => {}); });
+        row.querySelector('.broadcast').addEventListener('click', async () => {
+          status('📢 re-broadcasting…', AMBER);
+          try {
+            const r = await fetch(API_BASE + '/attention/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: rec.name, volume: +volSlider.value }) });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) { status('✗ ' + (d.detail || ('HTTP ' + r.status)), RED); return; }
+            status(`✓ played on ${d.played} speakers`, GREEN);
+          } catch (e) { status('✗ ' + (e.message || 'failed'), RED); }
+        });
+        row.querySelector('.del').addEventListener('click', async () => {
+          if (!confirm('Delete this recording?')) return;
+          try { await fetch(API_BASE + '/attention/' + encodeURIComponent(rec.name), { method: 'DELETE' }); loadLibrary(); } catch (_) {}
+        });
+        libEl.appendChild(row);
+      }
+    }
+
+    // Secure-context guard: recording needs HTTPS (or localhost)
+    if (!window.isSecureContext) {
+      recBtn.disabled = true;
+      const note = $('att-secure-note');
+      note.hidden = false;
+      note.innerHTML = '🔒 Recording needs a secure connection. Loading the HTTPS address…';
+      fetch(API_BASE + '/state').then(r => r.json()).then(s => {
+        const port = s.https_port || 0;
+        if (port) note.innerHTML = `🔒 To record, open <a href="https://${location.hostname}:${port}/">https://${location.hostname}:${port}</a> (accept the one-time security warning).`;
+        else note.innerHTML = '🔒 Recording needs HTTPS or localhost — open this app over its https:// address to enable the microphone.';
+      }).catch(() => {});
+    }
+  })();
 })();
 </script>
 </body>

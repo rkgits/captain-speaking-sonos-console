@@ -10,11 +10,13 @@ case "$ENV" in
     DEPLOY_DIR="$HOME/sonos/staging"
     LAUNCHAGENT="com.sonos-app-staging"
     PORT=8788
+    HTTPS_PORT=8444
     ;;
   production)
     DEPLOY_DIR="$HOME/sonos/production"
     LAUNCHAGENT="com.sonos-app"
     PORT=8787
+    HTTPS_PORT=8443
     ;;
   *)
     echo "Usage: deploy.sh [staging|production]"
@@ -34,6 +36,7 @@ if [ "$ENV" = "production" ] && [ -d "$DEPLOY_DIR/app.py" -o -f "$DEPLOY_DIR/app
   rsync -a \
     --exclude='.git/' --exclude='.venv/' \
     --exclude='__pycache__/' --exclude='*.log' \
+    --exclude='certs/' --exclude='recordings/' \
     "$DEPLOY_DIR/" "$SNAPSHOT/"
   echo "==> Snapshot saved → $SNAPSHOT"
   # Keep only the 3 most recent snapshots
@@ -48,14 +51,37 @@ rsync -a --delete \
   --exclude='__pycache__/' \
   --exclude='*.log' \
   --exclude='.pytest_cache/' \
+  --exclude='certs/' \
+  --exclude='recordings/' \
   "$RUNNER_WORKSPACE/" "$DEPLOY_DIR/"
 
-# 3. Recreate run_server.sh (env-specific, not in git)
+# 2b. Ensure recordings dir (persists across deploys; excluded from rsync)
+mkdir -p "$DEPLOY_DIR/recordings"
+
+# 2c. Generate a self-signed cert once (for the HTTPS listener; excluded from rsync)
+CERTS="$DEPLOY_DIR/certs"
+if [ ! -f "$CERTS/cert.pem" ]; then
+  echo "==> Generating self-signed TLS cert (10y)"
+  mkdir -p "$CERTS"
+  LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo 127.0.0.1)
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+    -keyout "$CERTS/key.pem" -out "$CERTS/cert.pem" \
+    -subj "/CN=sonos.local" \
+    -addext "subjectAltName=DNS:sonos.local,DNS:localhost,IP:$LAN_IP,IP:127.0.0.1" 2>/dev/null
+fi
+
+# 3. Recreate run_server.sh (env-specific, not in git) — runs HTTP + HTTPS side by side.
 cat > "$DEPLOY_DIR/run_server.sh" << SCRIPT
 #!/bin/bash
 cd $DEPLOY_DIR
-echo "[\$(date)] Starting $ENV server..." >> $DEPLOY_DIR/server.log 2>&1
-exec /usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT
+echo "[\$(date)] Starting $ENV server (HTTP $PORT + HTTPS $HTTPS_PORT)..." >> $DEPLOY_DIR/server.log 2>&1
+export PUBLIC_HTTP_PORT=$PORT
+export HTTPS_PORT=$HTTPS_PORT
+/usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT >> $DEPLOY_DIR/server.log 2>&1 &
+/usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $HTTPS_PORT \\
+  --ssl-keyfile $DEPLOY_DIR/certs/key.pem --ssl-certfile $DEPLOY_DIR/certs/cert.pem >> $DEPLOY_DIR/server.log 2>&1 &
+wait -n
+kill 0
 SCRIPT
 chmod +x "$DEPLOY_DIR/run_server.sh"
 
