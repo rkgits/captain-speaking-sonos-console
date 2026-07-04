@@ -758,6 +758,16 @@
   .device-chip button { background: none; border: none; color: var(--brass-mid); cursor: pointer;
     font-size: 11px; text-decoration: underline; font-family: inherit; }
   .vol-wrap { margin-bottom: 22px; }
+  .chime-wrap { margin-bottom: 22px; }
+  .chime-toggle { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; -webkit-user-select: none; user-select: none; }
+  .chime-toggle input { display: none; }
+  .chime-toggle .switch { width: 46px; height: 26px; border-radius: 13px; flex: none; position: relative;
+    background: rgba(0,0,0,0.45); border: 1px solid var(--ink); box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); transition: background 0.2s; }
+  .chime-toggle .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff2b8, #c39a3a 60%, #6b4a08); box-shadow: 0 1px 3px rgba(0,0,0,0.6); transition: transform 0.2s; }
+  .chime-toggle input:checked + .switch { background: linear-gradient(90deg, var(--brass-mid), var(--brass-hi)); }
+  .chime-toggle input:checked + .switch::after { transform: translateX(20px); }
+  .chime-label { font-size: 13px; color: var(--cream); }
   .vol-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
   .vol-head .val { font-size: 22px; color: var(--brass-hi); font-weight: bold; }
   .att input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px;
@@ -792,22 +802,6 @@
   .secure-note { margin: 8px 30px 0; padding: 14px 18px; border-radius: 8px; text-align: center;
     background: rgba(255,184,74,0.12); border: 1px solid var(--led-amber); color: var(--cream); font-size: 13px; }
   .secure-note a { color: var(--brass-hi); font-weight: bold; }
-  .lib { margin: 26px 30px 0; border-top: 1px solid rgba(195,154,58,0.3); padding-top: 20px; }
-  .lib h3 { font-family: "Courier New", monospace; font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--brass-mid); margin-bottom: 14px; }
-  .rec-row { display: flex; align-items: center; gap: 14px; padding: 11px 14px; margin-bottom: 9px;
-    background: rgba(0,0,0,0.28); border: 1px solid var(--ink); border-radius: 8px; }
-  .rec-row .play { width: 38px; height: 38px; flex: none; border-radius: 50%; cursor: pointer;
-    background: radial-gradient(circle at 35% 30%, #fff2b8, #c39a3a 60%, #6b4a08); border: 2px solid var(--ink); color: var(--ink);
-    font-size: 15px; display: flex; align-items: center; justify-content: center; }
-  .rec-row .meta { flex: 1; min-width: 0; }
-  .rec-row .fname { font-size: 13px; color: var(--cream); word-break: break-all; }
-  .rec-row .rsub { font-size: 11px; color: var(--parchment); opacity: 0.7; margin-top: 2px; }
-  .rec-row .acts { display: flex; gap: 8px; flex: none; }
-  .mini { font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 7px 12px; border-radius: 5px; cursor: pointer; border: 1px solid var(--ink); color: var(--ink); }
-  .mini.broadcast { background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid)); }
-  .mini.del { background: linear-gradient(180deg, #d98a7a, #a3402f); color: #fff; }
-  .lib-empty { color: var(--parchment); opacity: 0.6; font-style: italic; font-size: 13px; }
 </style>
 </head>
 <body>
@@ -868,6 +862,14 @@
               <input type="range" id="att-vol" min="0" max="100" value="45" />
               <div class="hint" style="margin-top:8px;">Set before recording — it broadcasts to all speakers the moment you stop.</div>
             </div>
+            <div class="chime-wrap">
+              <label class="chime-toggle">
+                <input type="checkbox" id="att-chime" />
+                <span class="switch"></span>
+                <span class="chime-label">✈ Play airplane chime first</span>
+              </label>
+              <div class="hint" style="margin-top:6px;">Sounds the seatbelt “bong”, then your announcement.</div>
+            </div>
           </div>
           <div class="att-col">
             <div class="recorder">
@@ -882,12 +884,6 @@
             </div>
           </div>
         </div>
-        <audio id="att-player" style="display:none"></audio>
-      </div>
-
-      <div class="lib">
-        <h3>✈ Flight Log — recent announcements</h3>
-        <div id="att-lib"></div>
       </div>
     </div>
   </div>
@@ -1495,11 +1491,9 @@
     const AMBER = 'var(--led-amber)', GREEN = 'var(--led-green)', RED = 'var(--led-red)';
     const tabs = document.querySelectorAll('.tab');
     const views = { console: $('view-console'), attention: $('view-attention') };
-    let libLoaded = false;
     tabs.forEach(t => t.addEventListener('click', () => {
       tabs.forEach(x => x.classList.toggle('active', x === t));
       for (const k in views) views[k].hidden = (k !== t.dataset.tab);
-      if (t.dataset.tab === 'attention' && !libLoaded) { libLoaded = true; loadLibrary(); }
     }));
 
     // Hero image with graceful fallback
@@ -1529,12 +1523,17 @@
     const volSlider = $('att-vol'), volVal = $('att-vol-val');
     volSlider.addEventListener('input', () => volVal.textContent = volSlider.value);
 
+    // Airplane chime toggle (persisted; default ON)
+    const chimeEl = $('att-chime');
+    chimeEl.checked = (localStorage.getItem('att_play_chime') || '1') === '1';
+    chimeEl.addEventListener('change', () => localStorage.setItem('att_play_chime', chimeEl.checked ? '1' : '0'));
+
     // Meter bars
     const meter = $('att-meter'), BARS = 24, bars = [];
     for (let i = 0; i < BARS; i++) { const b = document.createElement('div'); b.className = 'bar'; meter.appendChild(b); bars.push(b); }
 
     const recBtn = $('att-rec'), recIcon = $('att-icon'), recRing = $('att-ring');
-    const cdEl = $('att-cd'), statusEl = $('att-status'), hintEl = $('att-hint'), player = $('att-player');
+    const cdEl = $('att-cd'), statusEl = $('att-status'), hintEl = $('att-hint');
     function status(msg, color) { statusEl.textContent = msg; statusEl.style.color = color || AMBER; }
 
     const MAX = 60;
@@ -1602,7 +1601,6 @@
       if (audioCtx) audioCtx.close();
       if (total < sampleRate * 0.3) { status('✗ too short — hold to record', RED); return; }
       const blob = encodeWAV(samples, sampleRate);
-      player.src = URL.createObjectURL(blob); player.style.display = 'block'; player.controls = true;
       uploadAndBroadcast(blob);
     }
 
@@ -1623,58 +1621,17 @@
       try {
         const r = await fetch(API_BASE + '/attention/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'audio/wav', 'X-Device-Name': encodeURIComponent(deviceName), 'X-Clip-Volume': String(volSlider.value) },
+          headers: { 'Content-Type': 'audio/wav', 'X-Device-Name': encodeURIComponent(deviceName), 'X-Clip-Volume': String(volSlider.value), 'X-Play-Chime': chimeEl.checked ? '1' : '0' },
           body: blob,
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) { status('✗ ' + (d.detail || ('HTTP ' + r.status)), RED); return; }
         const failN = (d.failed || []).length;
         status(failN ? `✓ played on ${d.played}, ${failN} failed — stream resumed` : `✓ played on all ${d.played} speakers — stream resumed`, GREEN);
-        loadLibrary();
       } catch (e) { status('✗ ' + (e.message || 'upload failed'), RED); }
     }
 
     recBtn.addEventListener('click', () => recording ? stopRec() : startRec());
-
-    // Library
-    const libEl = $('att-lib');
-    async function loadLibrary() {
-      try {
-        const r = await fetch(API_BASE + '/attention/list');
-        const d = await r.json();
-        renderLibrary(d.recordings || []);
-      } catch (_) {}
-    }
-    function fmtBytes(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB'; }
-    function renderLibrary(recs) {
-      libEl.innerHTML = '';
-      if (!recs.length) { libEl.innerHTML = '<div class="lib-empty">No announcements yet — record one above.</div>'; return; }
-      for (const rec of recs) {
-        const row = document.createElement('div');
-        row.className = 'rec-row';
-        const when = new Date(rec.mtime * 1000).toLocaleString();
-        row.innerHTML = `
-          <div class="play">▶</div>
-          <div class="meta"><div class="fname"></div><div class="rsub">${when} · ${fmtBytes(rec.size)}</div></div>
-          <div class="acts"><button class="mini broadcast">📢 Broadcast</button><button class="mini del">Delete</button></div>`;
-        row.querySelector('.fname').textContent = rec.name;
-        row.querySelector('.play').addEventListener('click', () => { player.src = API_BASE + rec.url; player.style.display = 'block'; player.controls = true; player.play().catch(() => {}); });
-        row.querySelector('.broadcast').addEventListener('click', async () => {
-          status('📢 re-broadcasting…', AMBER);
-          try {
-            const r = await fetch(API_BASE + '/attention/broadcast', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ file: rec.name, volume: +volSlider.value }) });
-            const d = await r.json().catch(() => ({}));
-            if (!r.ok) { status('✗ ' + (d.detail || ('HTTP ' + r.status)), RED); return; }
-            status(`✓ played on ${d.played} speakers`, GREEN);
-          } catch (e) { status('✗ ' + (e.message || 'failed'), RED); }
-        });
-        row.querySelector('.del').addEventListener('click', async () => {
-          if (!confirm('Delete this recording?')) return;
-          try { await fetch(API_BASE + '/attention/' + encodeURIComponent(rec.name), { method: 'DELETE' }); loadLibrary(); } catch (_) {}
-        });
-        libEl.appendChild(row);
-      }
-    }
 
     // Secure-context guard: recording needs HTTPS (or localhost)
     if (!window.isSecureContext) {
