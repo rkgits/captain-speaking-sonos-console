@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sonos Console</title>
+<style>
+  :root {
+    --wood-dark:  #2b1608;
+    --wood-mid:   #4a2a14;
+    --wood-lite:  #6b3b1c;
+    --brass-hi:   #f6dc83;
+    --brass-mid:  #c39a3a;
+    --brass-lo:   #6b4a08;
+    --cream:      #f4e0b8;
+    --parchment:  #d9b781;
+    --ink:        #1a0d05;
+    --led-green:  #45e07a;
+    --led-red:    #ff4a3d;
+    --led-amber:  #ffb84a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Georgia", "Times New Roman", serif;
+    color: var(--cream);
+    padding: 28px 28px 60px;
+    min-height: 100vh;
+    background-color: var(--wood-mid);
+    background-image:
+      radial-gradient(ellipse at 50% 15%, rgba(200,140,70,0.35), transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(255,180,110,0.15), transparent 55%),
+      repeating-linear-gradient(89deg,
+        rgba(20,10,5,0.35) 0, rgba(20,10,5,0.35) 1px,
+        transparent 1px, transparent 4px,
+        rgba(20,10,5,0.18) 4px, rgba(20,10,5,0.18) 5px,
+        transparent 5px, transparent 11px,
+        rgba(20,10,5,0.28) 11px, rgba(20,10,5,0.28) 12px,
+        transparent 12px, transparent 22px),
+      linear-gradient(180deg, var(--wood-mid), var(--wood-dark));
+    background-attachment: fixed;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(circle at 30% 20%, rgba(255,200,140,0.10), transparent 40%),
+      radial-gradient(circle at 70% 90%, rgba(0,0,0,0.35), transparent 60%);
+    mix-blend-mode: overlay;
+  }
+
+  /* --- Brand plate --- */
+  .brand {
+    max-width: 1200px;
+    margin: 0 auto 26px;
+    text-align: center;
+    padding: 18px 24px;
+    background: linear-gradient(180deg, var(--brass-hi) 0%, var(--brass-mid) 55%, var(--brass-lo) 100%);
+    color: var(--ink);
+    border: 2px solid #2a1408;
+    border-radius: 6px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,240,180,0.7),
+      inset 0 -2px 4px rgba(0,0,0,0.4),
+      0 6px 18px rgba(0,0,0,0.5);
+    letter-spacing: 0.35em;
+    position: relative;
+  }
+  .brand h1 {
+    font-family: "Georgia", serif;
+    font-size: 26px;
+    font-weight: bold;
+    letter-spacing: 0.55em;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.35);
+  }
+  .brand .sub {
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    margin-top: 4px;
+    opacity: 0.75;
+  }
+  .screw {
+    position: absolute; width: 10px; height: 10px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff2b8, #8b6914 60%, #3a2408);
+    box-shadow: inset 0 -1px 1px rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.6);
+  }
+  .screw::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(0deg, transparent 45%, #2a1408 45%, #2a1408 55%, transparent 55%);
+    border-radius: 50%;
+    transform: rotate(30deg);
+  }
+  .brand .screw.tl { top: 8px; left: 10px; }
+  .brand .screw.tr { top: 8px; right: 10px; }
+  .brand .screw.bl { bottom: 8px; left: 10px; }
+  .brand .screw.br { bottom: 8px; right: 10px; }
+
+  /* --- Now playing panel --- */
+  .now-wrap {
+    max-width: 1200px;
+    margin: 0 auto 30px;
+  }
+  .now {
+    background:
+      radial-gradient(ellipse at 15% 0%, rgba(255,180,90,0.15), transparent 60%),
+      linear-gradient(180deg, #5c3520, #2b1608);
+    border: 2px solid var(--ink);
+    border-radius: 10px;
+    padding: 22px 26px;
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    gap: 24px;
+    align-items: center;
+    box-shadow:
+      inset 0 1px 0 rgba(255,200,140,0.15),
+      inset 0 -3px 6px rgba(0,0,0,0.35),
+      0 6px 20px rgba(0,0,0,0.5);
+    position: relative;
+  }
+  .now .screw.tl { top: 8px; left: 8px; }
+  .now .screw.tr { top: 8px; right: 8px; }
+  .now .screw.bl { bottom: 8px; left: 8px; }
+  .now .screw.br { bottom: 8px; right: 8px; }
+
+  .now .title-row {
+    display: flex; align-items: baseline; gap: 12px;
+    margin-bottom: 4px;
+  }
+  .now .title-row .icon {
+    font-size: 20px; color: var(--brass-hi);
+    text-shadow: 0 0 8px rgba(246,220,131,0.5);
+  }
+  .now .title {
+    font-size: 24px;
+    color: var(--cream);
+    font-style: italic;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    line-height: 1.2;
+  }
+  .now .artist {
+    color: var(--parchment);
+    font-size: 16px;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+  .now .album {
+    color: var(--parchment);
+    font-size: 13px;
+    opacity: 0.75;
+    margin-bottom: 12px;
+  }
+
+  .progress-track {
+    height: 6px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 3px;
+    border: 1px solid var(--ink);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+    position: relative;
+    margin: 10px 0 6px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--brass-hi), var(--brass-mid));
+    box-shadow: 0 0 8px rgba(246,220,131,0.6);
+    transition: width 0.4s linear;
+  }
+  .progress-times {
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    color: var(--parchment);
+    display: flex;
+    justify-content: space-between;
+    letter-spacing: 0.1em;
+    margin-bottom: 14px;
+  }
+
+  .badges {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 8px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-family: "Courier New", monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    border: 1px solid var(--ink);
+    background: rgba(0,0,0,0.3);
+    color: var(--parchment);
+  }
+  .badge.state.playing {
+    background: linear-gradient(180deg, rgba(69,224,122,0.35), rgba(20,85,32,0.4));
+    color: #d0ffd8;
+    border-color: #2c6b30;
+  }
+  .badge.state.paused {
+    background: linear-gradient(180deg, rgba(255,184,74,0.3), rgba(90,55,15,0.4));
+    color: #ffe0a8;
+    border-color: #8b6914;
+  }
+  .badge.state.stopped {
+    background: rgba(0,0,0,0.4);
+    color: #a89478;
+  }
+  .badge.source {
+    background: linear-gradient(180deg, var(--brass-hi), var(--brass-lo));
+    color: var(--ink);
+    border-color: #2a1408;
+    font-weight: bold;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
+  }
+  .badge.device {
+    background: linear-gradient(180deg, var(--parchment), #a67a3a);
+    color: var(--ink);
+    border-color: #3a1e08;
+  }
+  .badge .dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: currentColor;
+  }
+  .badge.state.playing .dot {
+    background: var(--led-green);
+    box-shadow: 0 0 6px var(--led-green);
+    animation: pulse 1.6s infinite;
+  }
+  .badge.state.paused .dot {
+    background: var(--led-amber);
+    box-shadow: 0 0 6px var(--led-amber);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .session-line {
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    color: rgba(217,183,129,0.5);
+    letter-spacing: 0.1em;
+    margin-top: 12px;
+  }
+
+  /* --- Group control panel (replaces VU) --- */
+  .group-panel {
+    width: 240px;
+    justify-self: end;
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 14px 12px;
+    background: linear-gradient(180deg, #4a2810, #2b1608);
+    border: 2px solid var(--ink);
+    border-radius: 8px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,220,170,0.20),
+      inset 0 -2px 4px rgba(0,0,0,0.4),
+      0 4px 12px rgba(0,0,0,0.5);
+  }
+  .group-panel .label {
+    font-family: "Courier New", monospace;
+    font-size: 9px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--parchment);
+    text-align: center;
+    opacity: 0.8;
+  }
+  .transport-row {
+    display: flex; justify-content: center; align-items: center;
+    gap: 10px;
+  }
+  .t-btn {
+    background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo));
+    border: 1.5px solid var(--ink);
+    color: var(--ink);
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow:
+      inset 0 1px 0 rgba(255,240,180,0.7),
+      inset 0 -2px 3px rgba(0,0,0,0.4),
+      0 3px 6px rgba(0,0,0,0.5);
+    display: flex; align-items: center; justify-content: center;
+    transition: transform 0.08s, box-shadow 0.08s;
+    padding: 0;
+    line-height: 1;
+  }
+  .t-btn.big {
+    width: 56px; height: 56px;
+    font-size: 22px;
+  }
+  .t-btn:hover { transform: translateY(-1px); }
+  .t-btn:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 2px 3px rgba(0,0,0,0.4),
+      inset 0 -1px 0 rgba(255,240,180,0.3);
+  }
+
+  .master-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .h-fader {
+    flex: 1;
+    height: 30px;
+    position: relative;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .h-fader-slot {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    left: 6px; right: 6px;
+    height: 8px;
+    background: linear-gradient(180deg, #0f0703, #2a1408);
+    border: 1px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: inset 0 2px 3px rgba(0,0,0,0.6);
+  }
+  .h-fader-fill {
+    position: absolute;
+    top: 50%; transform: translateY(-50%);
+    left: 7px;
+    height: 6px;
+    background: linear-gradient(90deg, var(--brass-lo), var(--brass-hi));
+    border-radius: 3px;
+    box-shadow: 0 0 6px rgba(246,220,131,0.4);
+  }
+  .h-fader-handle {
+    position: absolute;
+    top: 50%; transform: translate(-50%, -50%);
+    width: 20px; height: 26px;
+    background:
+      linear-gradient(180deg, #6b3b1c 0%, #4a2810 45%, #6b3b1c 55%, #3d2110 100%);
+    border: 1.5px solid var(--ink);
+    border-radius: 3px;
+    cursor: grab;
+    box-shadow:
+      inset 0 1px 0 rgba(255,220,170,0.35),
+      0 2px 4px rgba(0,0,0,0.6);
+  }
+  .h-fader-handle:active { cursor: grabbing; }
+  .master-readout {
+    background: linear-gradient(180deg, #2a1408, #100804);
+    color: var(--led-amber);
+    font-family: "Courier New", monospace;
+    font-size: 15px;
+    padding: 4px 8px;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    min-width: 46px;
+    text-align: center;
+    text-shadow: 0 0 6px rgba(255,180,50,0.75);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.7);
+  }
+
+  /* --- Speaker row --- */
+  .grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .card {
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(255,200,140,0.10), transparent 60%),
+      linear-gradient(180deg, #6b3b1c 0%, #3d2110 100%);
+    border: 2px solid var(--ink);
+    border-radius: 12px;
+    padding: 24px 14px 20px;
+    position: relative;
+    box-shadow:
+      inset 0 1px 0 rgba(255,220,170,0.20),
+      inset 0 -3px 8px rgba(0,0,0,0.40),
+      0 8px 22px rgba(0,0,0,0.55);
+    text-align: center;
+    transition: box-shadow 0.15s;
+    min-height: 400px;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .card.playing {
+    box-shadow:
+      inset 0 1px 0 rgba(255,220,170,0.30),
+      inset 0 -3px 8px rgba(0,0,0,0.40),
+      0 0 0 2px rgba(240,180,90,0.35),
+      0 8px 28px rgba(180,110,40,0.35);
+  }
+  .card.coordinator {
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(255,220,140,0.25), transparent 65%),
+      linear-gradient(180deg, #7a4a24 0%, #4a2810 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255,235,180,0.35),
+      inset 0 -3px 8px rgba(0,0,0,0.40),
+      0 0 0 2px rgba(246,220,131,0.6),
+      0 10px 32px rgba(240,180,90,0.35);
+  }
+  .card.offline { opacity: 0.5; filter: grayscale(0.4); }
+  .card .screw.tl { top: 8px; left: 8px; }
+  .card .screw.tr { top: 8px; right: 8px; }
+  .card .screw.bl { bottom: 8px; left: 8px; }
+  .card .screw.br { bottom: 8px; right: 8px; }
+
+  .coord-plate {
+    position: absolute;
+    top: -12px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo));
+    color: var(--ink);
+    border: 1px solid #2a1408;
+    padding: 3px 12px;
+    border-radius: 3px;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    font-weight: bold;
+    box-shadow:
+      inset 0 1px 0 rgba(255,240,180,0.7),
+      0 2px 4px rgba(0,0,0,0.5);
+    z-index: 2;
+    white-space: nowrap;
+  }
+
+  .card .nameplate {
+    background: linear-gradient(180deg, var(--parchment), #b8945a);
+    color: var(--ink);
+    border: 1px solid #3a1e08;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    display: inline-block;
+    margin-bottom: 8px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+    max-width: 90%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card .subline {
+    font-family: "Courier New", monospace;
+    font-size: 9px;
+    color: var(--parchment);
+    letter-spacing: 0.2em;
+    opacity: 0.7;
+    margin-bottom: 8px;
+  }
+
+  .leds {
+    display: flex; justify-content: center; gap: 10px;
+    margin-bottom: 8px; height: 12px;
+  }
+  .led {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #2a1408;
+    border: 1px solid var(--ink);
+    box-shadow: inset 0 1px 1px rgba(0,0,0,0.6);
+  }
+  .led.on.playing {
+    background: radial-gradient(circle at 35% 30%, #b5ffcc, var(--led-green) 60%, #145520);
+    box-shadow: 0 0 6px var(--led-green), inset 0 1px 1px rgba(255,255,255,0.4);
+  }
+  .led.on.muted {
+    background: radial-gradient(circle at 35% 30%, #ffc8bd, var(--led-red) 60%, #6b1b12);
+    box-shadow: 0 0 6px var(--led-red), inset 0 1px 1px rgba(255,255,255,0.4);
+  }
+
+  /* --- Fader --- */
+  .fader-wrap {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center;
+    gap: 14px;
+    margin: 4px 0 8px;
+    padding: 6px 0;
+    width: 100%;
+  }
+  .fader {
+    position: relative;
+    width: 36px;
+    height: 200px;
+    user-select: none;
+    touch-action: none;
+    cursor: grab;
+  }
+  .fader:active { cursor: grabbing; }
+  .fader-slot {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    top: 0; bottom: 0;
+    width: 10px;
+    background: linear-gradient(180deg, #0f0703 0%, #2a1408 100%);
+    border: 1px solid #1a0d05;
+    border-radius: 6px;
+    box-shadow:
+      inset 2px 0 3px rgba(0,0,0,0.6),
+      inset -1px 0 1px rgba(255,200,140,0.1);
+  }
+  .fader-ticks {
+    position: absolute;
+    top: 8px; bottom: 8px;
+    left: calc(50% + 12px);
+    width: 14px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    pointer-events: none;
+  }
+  .fader-ticks .tick {
+    height: 1px;
+    background: rgba(244,224,184,0.5);
+    width: 100%;
+  }
+  .fader-ticks .tick.major {
+    background: var(--parchment);
+    height: 2px;
+    width: 100%;
+  }
+  .fader-scale {
+    position: absolute;
+    left: calc(50% + 28px);
+    top: 4px; bottom: 4px;
+    display: flex; flex-direction: column; justify-content: space-between;
+    font-family: "Courier New", monospace;
+    font-size: 8px;
+    color: var(--parchment);
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+  }
+  .fader-handle {
+    position: absolute;
+    left: -6px;
+    width: 48px; height: 28px;
+    top: 0;
+    background:
+      linear-gradient(180deg, #6b3b1c 0%, #4a2810 45%, #6b3b1c 55%, #3d2110 100%);
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    box-shadow:
+      inset 0 1px 0 rgba(255,220,170,0.35),
+      inset 0 -2px 3px rgba(0,0,0,0.5),
+      0 3px 8px rgba(0,0,0,0.65);
+    cursor: grab;
+    transition: box-shadow 0.15s;
+  }
+  .fader-handle:hover {
+    box-shadow:
+      inset 0 1px 0 rgba(255,240,190,0.45),
+      inset 0 -2px 3px rgba(0,0,0,0.5),
+      0 4px 10px rgba(0,0,0,0.7),
+      0 0 8px rgba(246,220,131,0.35);
+  }
+  .fader-handle:active { cursor: grabbing; }
+  .fader-handle::after {
+    content: "";
+    position: absolute;
+    left: 4px; right: 4px;
+    top: 50%; transform: translateY(-50%);
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--brass-hi), transparent);
+    box-shadow: 0 0 3px var(--brass-hi);
+  }
+  .fader-handle::before {
+    content: "";
+    position: absolute;
+    left: 4px; right: 4px;
+    top: 4px; bottom: 4px;
+    background:
+      repeating-linear-gradient(90deg,
+        transparent 0, transparent 3px,
+        rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px);
+    border-radius: 2px;
+  }
+
+  .readout {
+    background: linear-gradient(180deg, #2a1408, #100804);
+    color: var(--led-amber);
+    font-family: "Courier New", monospace;
+    font-size: 22px;
+    letter-spacing: 0.15em;
+    padding: 6px 14px;
+    border: 1px solid var(--ink);
+    border-radius: 3px;
+    min-width: 68px;
+    text-align: center;
+    text-shadow: 0 0 6px rgba(255,180,50,0.75);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.7), 0 0 8px rgba(255,140,40,0.15);
+  }
+
+  .controls {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    width: 100%;
+  }
+  .btn {
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--ink);
+    cursor: pointer;
+    background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo));
+    color: var(--ink);
+    font-weight: bold;
+    box-shadow:
+      inset 0 1px 0 rgba(255,240,180,0.6),
+      inset 0 -2px 2px rgba(0,0,0,0.35),
+      0 2px 4px rgba(0,0,0,0.4);
+    transition: transform 0.08s, box-shadow 0.08s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 2px 3px rgba(0,0,0,0.4),
+      inset 0 -1px 0 rgba(255,240,180,0.3);
+  }
+  .btn.mute.on {
+    background: linear-gradient(180deg, #b03225, #601e14);
+    color: #ffd0c8;
+    box-shadow:
+      inset 0 1px 0 rgba(255,150,140,0.4),
+      inset 0 -1px 2px rgba(0,0,0,0.4),
+      0 0 8px rgba(255,60,40,0.6);
+  }
+  .btn.join {
+    background: linear-gradient(180deg, #86c88a, #2c6b30);
+    color: #f0fff0;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  }
+  .btn.leave {
+    background: linear-gradient(180deg, #c48a3a, #6b4a08);
+    color: #fff2c8;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.25);
+  }
+
+  .error-bar {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    padding: 10px 16px;
+    background: rgba(180,40,30,0.35);
+    border: 1px solid #6b1b12;
+    color: #ffd0c8;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 12px;
+    display: none;
+  }
+  .error-bar.show { display: block; }
+</style>
+</head>
+<body>
+
+  <div class="brand">
+    <div class="screw tl"></div>
+    <div class="screw tr"></div>
+    <div class="screw bl"></div>
+    <div class="screw br"></div>
+    <h1>SONOS CONSOLE</h1>
+    <div class="sub">Vintage Series · Model MMXXVI</div>
+  </div>
+
+  <div id="error-bar" class="error-bar"></div>
+
+  <div class="now-wrap" id="now-wrap"></div>
+
+  <div class="grid" id="grid"></div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const grid = $('grid');
+  const nowWrap = $('now-wrap');
+  const errorBar = $('error-bar');
+
+  const API_BASE = (location.protocol.startsWith('http') && location.host)
+    ? `${location.protocol}//${location.host}`
+    : 'http://127.0.0.1:8787';
+
+  let latest = { devices: {}, groups: [], transport: {}, volumes: {}, group_volumes: {} };
+  // uuid -> current local displayed volume (during drag, or stale)
+  const localVals = new Map();
+  // uuid -> ms timestamp until which server updates are ignored
+  const localLock = new Map();
+  // any active drag suppresses full re-render
+  let activeDrag = 0;
+  // progress ticker reference (set by renderNow)
+  let progressRef = null;
+  // master group volume: local override during drag
+  let masterLocal = { until: 0, value: null };
+
+  // ---- Peer prediction helpers ----
+  function currentSpeakerVolume(uuid) {
+    if (isLocked(uuid)) return localVals.get(uuid) ?? (latest.volumes[uuid] || {}).volume ?? 0;
+    return (latest.volumes[uuid] || {}).volume ?? 0;
+  }
+  function currentMasterVolume(coord) {
+    if (performance.now() < masterLocal.until && masterLocal.value != null) return masterLocal.value;
+    return (latest.group_volumes || {})[coord] ?? 0;
+  }
+  // Update speaker fader DOM without re-rendering
+  function setSpeakerVisual(uuid, v) {
+    v = Math.max(0, Math.min(100, v));
+    localVals.set(uuid, v);
+    const fader = grid.querySelector(`.fader[data-uuid="${uuid}"]`);
+    if (fader) {
+      fader.dataset.value = v;
+      const handle = fader.querySelector('.fader-handle');
+      if (handle) handle.style.top = `calc(${100 - v}% - 14px)`;
+    }
+    const readout = grid.querySelector(`[data-readout-for="${uuid}"]`);
+    if (readout) readout.textContent = Math.round(v);
+  }
+  function setMasterVisual(v) {
+    v = Math.round(Math.max(0, Math.min(100, v)));
+    masterLocal = { until: performance.now() + 5000, value: v };
+    const fader = nowWrap.querySelector('#master-fader');
+    if (!fader) return;
+    fader.dataset.value = v;
+    const fill = fader.querySelector('.h-fader-fill');
+    const handle = fader.querySelector('.h-fader-handle');
+    if (fill) fill.style.width = `calc(${v}% - 12px)`;
+    if (handle) handle.style.left = `calc(${v}% + 3px)`;
+    const ro = nowWrap.querySelector('#master-readout');
+    if (ro) ro.textContent = v;
+  }
+  // When a single speaker moves, recompute master = mean of unmuted members
+  function recomputeMasterFromSpeakers() {
+    const g = playingGroup();
+    if (!g) return;
+    let sum = 0, n = 0;
+    for (const uuid of g.member_uuids) {
+      const r = latest.volumes[uuid] || {};
+      if (r.muted) continue;
+      sum += currentSpeakerVolume(uuid);
+      n++;
+    }
+    if (n) setMasterVisual(sum / n);
+  }
+  // When master moves, ratio-scale every member speaker
+  function distributeMasterToSpeakers(newMaster, prevMaster) {
+    const g = playingGroup();
+    if (!g) return;
+    for (const uuid of g.member_uuids) {
+      const cur = currentSpeakerVolume(uuid);
+      let next;
+      if (prevMaster > 0) {
+        next = cur * (newMaster / prevMaster);
+      } else {
+        next = newMaster;   // Sonos snaps everyone to master when starting from 0
+      }
+      lock(uuid, 5000);
+      setSpeakerVisual(uuid, next);
+    }
+  }
+
+  const now = () => performance.now();
+  const isLocked = (uuid) => (localLock.get(uuid) || 0) > now();
+  const lock = (uuid, ms = 1200) => localLock.set(uuid, now() + ms);
+
+  async function apiPost(path, body) {
+    try {
+      const r = await fetch(API_BASE + path, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(await r.text());
+      return await r.json();
+    } catch (e) { console.error('POST', path, e); }
+  }
+
+  async function refresh() {
+    try {
+      const r = await fetch(API_BASE + '/state');
+      latest = await r.json();
+      errorBar.classList.toggle('show', !!latest.last_error);
+      errorBar.textContent = latest.last_error || '';
+      if (!activeDrag) render();
+    } catch (e) {
+      errorBar.classList.add('show');
+      errorBar.textContent = 'Cannot reach backend at ' + API_BASE + ': ' + e;
+    }
+  }
+
+  function escapeHTML(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => (
+      {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+    ));
+  }
+
+  function parseTime(s) {
+    if (!s || typeof s !== 'string') return 0;
+    const parts = s.split(':').map(Number);
+    if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return parts[0] || 0;
+  }
+  function fmtTime(seconds) {
+    if (!seconds || seconds < 0) return '0:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.floor(seconds % 60);
+    return h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${m}:${String(s).padStart(2,'0')}`;
+  }
+
+  function playingGroup() {
+    const groups = latest.groups || [];
+    const scored = groups.map(g => {
+      const t = latest.transport[g.coordinator_uuid] || {};
+      let score = 0;
+      if (t.state === 'PLAYING') score = 100;
+      else if (t.state === 'PAUSED_PLAYBACK') score = 60;
+      else if (t.state === 'TRANSITIONING') score = 40;
+      score += (g.member_uuids || []).length;
+      return { g, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    return scored.length ? scored[0].g : null;
+  }
+
+  function screws() {
+    return `<div class="screw tl"></div><div class="screw tr"></div><div class="screw bl"></div><div class="screw br"></div>`;
+  }
+
+  function renderNow() {
+    const g = playingGroup();
+    if (!g) { nowWrap.innerHTML = ''; return; }
+    const t = latest.transport[g.coordinator_uuid] || {};
+    const coord = latest.devices[g.coordinator_uuid];
+    const state = t.state || '—';
+    const stateLabel = ({
+      PLAYING: 'Playing',
+      PAUSED_PLAYBACK: 'Paused',
+      STOPPED: 'Stopped',
+      TRANSITIONING: 'Loading…',
+    })[state] || state;
+    const stateCls = state === 'PLAYING' ? 'playing'
+      : state === 'PAUSED_PLAYBACK' ? 'paused' : 'stopped';
+    const title = t.title || (state === 'STOPPED' ? '— nothing loaded —' : 'Untitled');
+    const source = t.source || 'Unknown';
+    const memberCount = (g.member_uuids || []).length;
+
+    // Progress
+    const elapsedS = parseTime(t.elapsed);
+    const durationS = parseTime(t.duration);
+    const pct = durationS > 0 ? Math.min(100, (elapsedS / durationS) * 100) : 0;
+    const showProgress = durationS > 0 && durationS < 24 * 3600;
+
+    const memberChips = g.member_uuids.map(uuid => {
+      const d = latest.devices[uuid];
+      return d ? escapeHTML(d.name) : '';
+    }).filter(Boolean).join(' · ');
+
+    // Remember reference for smooth ticker
+    progressRef = {
+      coord: g.coordinator_uuid,
+      base: elapsedS,
+      duration: durationS,
+      state: state,
+      fetchedAt: performance.now(),
+    };
+
+    const rawGv = currentMasterVolume(g.coordinator_uuid) ?? latest.group_volumes?.[g.coordinator_uuid] ?? 0;
+    const gv = Math.round(rawGv);
+    const playPauseIcon = (state === 'PLAYING') ? '❚❚' : '▶';
+    const playPauseAction = (state === 'PLAYING') ? 'pause' : 'play';
+
+    nowWrap.innerHTML = `
+      <div class="now">
+        ${screws()}
+        <div>
+          <div class="title-row">
+            <span class="icon">♪</span>
+            <div class="title">${escapeHTML(title)}</div>
+          </div>
+          ${t.artist ? `<div class="artist">${escapeHTML(t.artist)}</div>` : ''}
+          ${t.album ? `<div class="album">${escapeHTML(t.album)}</div>` : ''}
+          ${showProgress ? `
+            <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:${pct}%"></div></div>
+            <div class="progress-times">
+              <span id="elapsed-time">${fmtTime(elapsedS)}</span>
+              <span>${fmtTime(durationS)}</span>
+            </div>
+          ` : ''}
+          <div class="badges">
+            <span class="badge state ${stateCls}"><span class="dot"></span>${escapeHTML(stateLabel)}</span>
+            <span class="badge source">${escapeHTML(source)}</span>
+            <span class="badge device">via ${escapeHTML(coord?.name || '?')}</span>
+            <span class="badge">${memberCount} speaker${memberCount === 1 ? '' : 's'}</span>
+          </div>
+          ${memberCount > 1 ? `<div class="session-line">Group · ${escapeHTML(memberChips)}</div>` : ''}
+          ${t.session ? `<div class="session-line">Session · ${escapeHTML(t.session.slice(0, 16))}${t.session.length > 16 ? '…' : ''}</div>` : ''}
+        </div>
+        <div class="group-panel" data-coord="${g.coordinator_uuid}">
+          <div class="label">Transport</div>
+          <div class="transport-row">
+            <button class="t-btn" data-t-action="prev" title="Previous">⏮</button>
+            <button class="t-btn big" data-t-action="${playPauseAction}" title="${playPauseAction}">${playPauseIcon}</button>
+            <button class="t-btn" data-t-action="next" title="Next">⏭</button>
+          </div>
+          <div class="label">Master Volume</div>
+          <div class="master-row">
+            <div class="h-fader" id="master-fader" data-value="${gv ?? 0}">
+              <div class="h-fader-slot"></div>
+              <div class="h-fader-fill" style="width: calc(${gv ?? 0}% - 12px)"></div>
+              <div class="h-fader-handle" style="left: calc(${gv ?? 0}% + 3px)"></div>
+            </div>
+            <div class="master-readout" id="master-readout">${gv ?? '—'}</div>
+          </div>
+        </div>
+      </div>
+    `;
+    attachTransport(g.coordinator_uuid);
+    attachMaster(g.coordinator_uuid);
+  }
+
+  function faderTicks() {
+    const ticks = [];
+    for (let i = 0; i < 21; i++) {
+      const major = (i % 5 === 0);
+      ticks.push(`<div class="tick ${major ? 'major' : ''}"></div>`);
+    }
+    return ticks.join('');
+  }
+
+  function render() {
+    renderNow();
+    const groups = latest.groups || [];
+    const devices = latest.devices || {};
+    const playing = playingGroup();
+    const playingCoord = playing?.coordinator_uuid;
+    const playingMembers = new Set(playing?.member_uuids || []);
+
+    // Order: coordinator first, then other playing members, then others alphabetical
+    const uuids = Object.keys(devices);
+    uuids.sort((a, b) => {
+      const aCoord = a === playingCoord ? -2 : 0;
+      const bCoord = b === playingCoord ? -2 : 0;
+      const aInPlaying = playingMembers.has(a) ? -1 : 0;
+      const bInPlaying = playingMembers.has(b) ? -1 : 0;
+      const sa = aCoord + aInPlaying;
+      const sb = bCoord + bInPlaying;
+      if (sa !== sb) return sa - sb;
+      return (devices[a].name || '').localeCompare(devices[b].name || '');
+    });
+
+    const html = uuids.map(uuid => {
+      const d = devices[uuid];
+      const vol = latest.volumes[uuid] || {};
+      const reachable = vol.reachable !== false;
+      const displayVol = isLocked(uuid)
+        ? (localVals.get(uuid) ?? vol.volume ?? 0)
+        : (vol.volume ?? 0);
+      const muted = vol.muted === true;
+      const inPlaying = playingMembers.has(uuid);
+      const isCoord = uuid === playingCoord;
+      const groupOf = groups.find(g => (g.member_uuids || []).includes(uuid));
+      const isCoordAny = groupOf?.coordinator_uuid === uuid;
+
+      let actionBtn = '';
+      if (playing && !inPlaying) {
+        actionBtn = `<button class="btn join" data-action="join" data-uuid="${uuid}" data-coord="${playingCoord}">+ Join</button>`;
+      } else if (playing && inPlaying && !isCoord) {
+        actionBtn = `<button class="btn leave" data-action="leave" data-uuid="${uuid}">Ungroup</button>`;
+      }
+
+      const cls = [
+        'card',
+        inPlaying ? 'playing' : '',
+        isCoord ? 'coordinator' : '',
+        reachable ? '' : 'offline'
+      ].filter(Boolean).join(' ');
+
+      const handleTopPct = 100 - displayVol;
+
+      return `
+        <div class="${cls}" data-uuid="${uuid}">
+          ${isCoord ? '<div class="coord-plate">◆ Coordinator ◆</div>' : ''}
+          ${screws()}
+          <div class="leds">
+            <div class="led ${inPlaying ? 'on playing' : ''}" title="In playing group"></div>
+            <div class="led ${muted ? 'on muted' : ''}" title="Muted"></div>
+          </div>
+          <div class="nameplate">${escapeHTML(d.name)}</div>
+          <div class="subline">${isCoordAny && !isCoord ? 'COORD (other group)' : (inPlaying && !isCoord ? 'MEMBER' : (isCoord ? 'PLAYING NOW' : 'STANDBY'))}</div>
+          <div class="fader-wrap">
+            <div class="fader" data-uuid="${uuid}" data-value="${displayVol}">
+              <div class="fader-slot"></div>
+              <div class="fader-ticks">${faderTicks()}</div>
+              <div class="fader-scale"><span>100</span><span>75</span><span>50</span><span>25</span><span>0</span></div>
+              <div class="fader-handle" style="top: calc(${handleTopPct}% - 14px)"></div>
+            </div>
+            <div class="readout" data-readout-for="${uuid}">${Math.round(displayVol)}</div>
+          </div>
+          <div class="controls">
+            <button class="btn mute ${muted ? 'on' : ''}" data-action="mute" data-uuid="${uuid}">${muted ? 'Unmute' : 'Mute'}</button>
+            ${actionBtn}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    grid.innerHTML = html;
+    attachFaders();
+    attachButtons();
+  }
+
+  const sendThrottle = new Map();
+  function scheduleSend(uuid, v) {
+    const rec = sendThrottle.get(uuid) || {};
+    const t = now();
+    const doSend = () => {
+      apiPost('/volume', {uuid, volume: Math.round(v)});
+      sendThrottle.set(uuid, {t: now(), timer: null});
+    };
+    if (!rec.t || t - rec.t > 130) {
+      if (rec.timer) clearTimeout(rec.timer);
+      doSend();
+    } else {
+      if (rec.timer) clearTimeout(rec.timer);
+      rec.timer = setTimeout(doSend, 130 - (t - rec.t));
+      sendThrottle.set(uuid, rec);
+    }
+  }
+
+  function attachFaders() {
+    for (const fader of grid.querySelectorAll('.fader')) {
+      const uuid = fader.dataset.uuid;
+
+      const applyVisual = (v) => {
+        setSpeakerVisual(uuid, v);
+        recomputeMasterFromSpeakers();
+      };
+
+      const setFromY = (clientY) => {
+        const r = fader.getBoundingClientRect();
+        // Position along the track — subtract handle half-height for accuracy
+        const yRel = clientY - r.top;
+        let pct = yRel / r.height;
+        pct = Math.max(0, Math.min(1, pct));
+        applyVisual((1 - pct) * 100);
+        scheduleSend(uuid, parseFloat(fader.dataset.value));
+      };
+
+      let dragging = false;
+      const onDown = (e) => {
+        e.preventDefault();
+        dragging = true;
+        activeDrag++;
+        fader.setPointerCapture(e.pointerId);
+        lock(uuid, 5000);
+        setFromY(e.clientY);
+      };
+      const onMove = (e) => {
+        if (!dragging) return;
+        setFromY(e.clientY);
+      };
+      const onUp = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        activeDrag = Math.max(0, activeDrag - 1);
+        try { fader.releasePointerCapture(e.pointerId); } catch (_) {}
+        scheduleSend(uuid, parseFloat(fader.dataset.value));
+        lock(uuid, 1500);
+      };
+
+      fader.addEventListener('pointerdown', onDown);
+      fader.addEventListener('pointermove', onMove);
+      fader.addEventListener('pointerup', onUp);
+      fader.addEventListener('pointercancel', onUp);
+
+      // Scroll wheel + trackpad two-finger scroll for fine control
+      fader.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const cur = parseFloat(fader.dataset.value) || 0;
+        const step = Math.abs(e.deltaY) > 30 ? 3 : 1;
+        const dir = e.deltaY < 0 ? 1 : -1;
+        applyVisual(cur + dir * step);
+        lock(uuid, 1200);
+        scheduleSend(uuid, parseFloat(fader.dataset.value));
+      }, { passive: false });
+    }
+  }
+
+  function attachButtons() {
+    for (const btn of grid.querySelectorAll('.btn')) {
+      btn.addEventListener('click', async () => {
+        const uuid = btn.dataset.uuid;
+        const action = btn.dataset.action;
+        btn.disabled = true;
+        if (action === 'mute') {
+          const nowMuted = btn.classList.contains('on');
+          await apiPost('/mute', {uuid, muted: !nowMuted});
+        } else if (action === 'join') {
+          await apiPost('/join', {uuid, coordinator_uuid: btn.dataset.coord});
+        } else if (action === 'leave') {
+          await apiPost('/leave', {uuid});
+        }
+        setTimeout(refresh, 300);
+      });
+    }
+  }
+
+  // ---- Transport buttons ----
+  function attachTransport(coord) {
+    for (const btn of nowWrap.querySelectorAll('.t-btn')) {
+      btn.addEventListener('click', async () => {
+        const a = btn.dataset.tAction;
+        btn.disabled = true;
+        await apiPost('/' + a, {coordinator_uuid: coord});
+        setTimeout(refresh, 250);
+      });
+    }
+  }
+
+  // ---- Master group volume fader (horizontal) ----
+  function attachMaster(coord) {
+    const fader = nowWrap.querySelector('#master-fader');
+    if (!fader) return;
+
+    const apply = (v) => {
+      const prev = parseFloat(fader.dataset.value) || 0;
+      setMasterVisual(v);
+      distributeMasterToSpeakers(parseFloat(fader.dataset.value), prev);
+    };
+
+    const setFromX = (clientX) => {
+      const r = fader.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+      apply(pct * 100);
+      scheduleMasterSend(coord, parseFloat(fader.dataset.value));
+    };
+
+    let dragging = false;
+    fader.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      dragging = true;
+      activeDrag++;
+      fader.setPointerCapture(e.pointerId);
+      setFromX(e.clientX);
+    });
+    fader.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      setFromX(e.clientX);
+    });
+    const end = (e) => {
+      if (!dragging) return;
+      dragging = false;
+      activeDrag = Math.max(0, activeDrag - 1);
+      try { fader.releasePointerCapture(e.pointerId); } catch (_) {}
+      scheduleMasterSend(coord, parseFloat(fader.dataset.value));
+      masterLocal = { until: performance.now() + 1500, value: parseFloat(fader.dataset.value) };
+    };
+    fader.addEventListener('pointerup', end);
+    fader.addEventListener('pointercancel', end);
+    fader.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const cur = parseFloat(fader.dataset.value) || 0;
+      const step = Math.abs(e.deltaY) > 30 ? 3 : 1;
+      const dir = e.deltaY < 0 ? 1 : -1;
+      apply(cur + dir * step);
+      scheduleMasterSend(coord, parseFloat(fader.dataset.value));
+    }, { passive: false });
+  }
+
+  const masterThrottle = { t: 0, timer: null };
+  function scheduleMasterSend(coord, v) {
+    const t = performance.now();
+    const doSend = () => {
+      apiPost('/group-volume', {coordinator_uuid: coord, volume: Math.round(v)});
+      masterThrottle.t = performance.now();
+      masterThrottle.timer = null;
+    };
+    if (!masterThrottle.t || t - masterThrottle.t > 130) {
+      if (masterThrottle.timer) clearTimeout(masterThrottle.timer);
+      doSend();
+    } else {
+      if (masterThrottle.timer) clearTimeout(masterThrottle.timer);
+      masterThrottle.timer = setTimeout(doSend, 130 - (t - masterThrottle.t));
+    }
+  }
+
+  // ---- Smooth elapsed ticker ----
+  function tickProgress() {
+    if (!progressRef) return;
+    const el = document.getElementById('elapsed-time');
+    const bar = document.getElementById('progress-fill');
+    if (!el || !bar) return;
+    let displayed = progressRef.base;
+    if (progressRef.state === 'PLAYING') {
+      displayed += (performance.now() - progressRef.fetchedAt) / 1000;
+    }
+    if (progressRef.duration > 0) {
+      displayed = Math.min(displayed, progressRef.duration);
+      const pct = (displayed / progressRef.duration) * 100;
+      bar.style.width = pct + '%';
+    }
+    el.textContent = fmtTime(displayed);
+  }
+
+  refresh();
+  setInterval(refresh, 5000);        // sync with speakers every 5s
+  setInterval(tickProgress, 500);    // smooth elapsed tick
+})();
+</script>
+</body>
+</html>
