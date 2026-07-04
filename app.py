@@ -13,10 +13,13 @@ import logging
 import os
 import re
 import subprocess
+import wave
 from typing import Any
 
+import urllib.parse
+
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +27,14 @@ from pydantic import BaseModel
 
 SOAP_TIMEOUT = 4.0
 REFRESH_INTERVAL = 2.0
+
+# Sonos local control (audioClip announcements) — well-known public local key, not a secret.
+SONOS_API_KEY = "123e4567-e89b-12d3-a456-426655440000"
+# Port Sonos speakers use to fetch recordings (plain HTTP; they can't use our self-signed HTTPS).
+PUBLIC_HTTP_PORT = int(os.environ.get("PUBLIC_HTTP_PORT", "8787"))
+# HTTPS port (for mic access on phones); surfaced to the UI so it can link there. 0 = none.
+HTTPS_PORT = int(os.environ.get("HTTPS_PORT", "0"))
+MAX_RECORDING_BYTES = 30 * 1024 * 1024
 
 RC_SVC = "urn:schemas-upnp-org:service:RenderingControl:1"
 AV_SVC = "urn:schemas-upnp-org:service:AVTransport:1"
@@ -295,6 +306,37 @@ def get_local_prefix() -> str | None:
     return None
 
 
+def get_local_ip() -> str | None:
+    for iface in ("en0", "en1"):
+        try:
+            ip = subprocess.check_output(["ipconfig", "getifaddr", iface], stderr=subprocess.DEVNULL).decode().strip()
+            if ip:
+                return ip
+        except Exception:
+            continue
+    return None
+
+
+async def play_audio_clip(
+    client: httpx.AsyncClient, ip: str, player_id: str, stream_url: str, volume: int | None = None
+) -> None:
+    """Play an announcement clip *over* whatever a player is doing (ducks, then restores).
+
+    Uses the Sonos local audioClip API on port 1443 (self-signed cert → caller must use
+    an httpx client with verify=False). Does not disturb the underlying AirPlay/queue source.
+    """
+    body: dict[str, Any] = {"name": "Attention", "appId": "com.sonos.console", "streamUrl": stream_url}
+    if volume is not None:
+        body["volume"] = max(0, min(100, int(volume)))
+    r = await client.post(
+        f"https://{ip}:1443/api/v1/players/{player_id}/audioClip",
+        headers={"X-Sonos-Api-Key": SONOS_API_KEY, "Content-Type": "application/json"},
+        json=body,
+        timeout=6.0,
+    )
+    r.raise_for_status()
+
+
 def arp_ips() -> list[str]:
     try:
         out = subprocess.check_output(["arp", "-a"]).decode()
@@ -434,6 +476,7 @@ def _sse_snapshot() -> str:
         "volumes": STATE.volumes,
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
+        "https_port": HTTPS_PORT,
     }
     return f"data: {json.dumps(payload)}\n\n"
 
@@ -510,6 +553,7 @@ async def api_state() -> dict:
         "volumes": STATE.volumes,
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
+        "https_port": HTTPS_PORT,
     }
 
 
@@ -635,6 +679,129 @@ async def api_group_volume(req: GroupVolReq) -> dict:
 BASE = os.path.dirname(os.path.abspath(__file__))
 app.mount("/static", StaticFiles(directory=os.path.join(BASE, "static")), name="static")
 
+# ---------- Attention (voice PA broadcast) ----------
+RECORDINGS_DIR = os.path.join(BASE, "recordings")
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
+# Served over plain HTTP so Sonos speakers can fetch the clip to play.
+app.mount("/recordings", StaticFiles(directory=RECORDINGS_DIR), name="recordings")
+
+
+def _safe_label(s: str) -> str:
+    """Filesystem-safe device label for filenames."""
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", s).strip("-")[:40] or "device"
+
+
+def _wav_duration(path: str) -> float:
+    """Length of a WAV file in seconds (0 if unreadable)."""
+    try:
+        with wave.open(path, "rb") as w:
+            rate = w.getframerate()
+            return w.getnframes() / rate if rate else 0.0
+    except Exception:
+        return 0.0
+
+
+def _fmt_duration(secs: float) -> str:
+    """Seconds -> m:ss (or 0:ss)."""
+    total = int(round(secs))
+    return f"{total // 60}:{total % 60:02d}"
+
+
+async def _broadcast_url(client, players: list, stream_url: str, volume: int) -> tuple[int, list[str]]:
+    """Fire one audioClip (stream_url) at every player. Returns (played, failed-names)."""
+    played = 0
+    failed: list[str] = []
+
+    async def one(uuid: str, dev: dict) -> None:
+        nonlocal played
+        try:
+            await play_audio_clip(client, dev["ip"], uuid, stream_url, volume)
+            played += 1
+        except Exception as e:
+            failed.append(dev.get("name", uuid))
+            _log.warning("audioClip to %s failed: %s", dev.get("name", uuid), str(e)[:120])
+
+    await asyncio.gather(*(one(u, d) for u, d in players))
+    return played, failed
+
+
+async def _broadcast_clip(fname: str, volume: int) -> dict:
+    """Broadcast recordings/<fname> to every speaker at the given volume.
+
+    The airplane chime (when enabled) is baked into the front of the recording
+    client-side, so a single clip guarantees chime → voice ordering.
+    """
+    lan_ip = get_local_ip()
+    if not lan_ip:
+        raise HTTPException(503, "cannot determine LAN IP for broadcast")
+    stream_url = f"http://{lan_ip}:{PUBLIC_HTTP_PORT}/recordings/{fname}"
+    async with httpx.AsyncClient(verify=False) as client:
+        played, failed = await _broadcast_url(client, list(STATE.devices.items()), stream_url, volume)
+    return {"played": played, "failed": failed, "url": stream_url}
+
+
+@app.post("/attention/upload")
+async def attention_upload(request: Request) -> dict:
+    """Receive a raw WAV body, store it named by date/time/IP/device, then broadcast to all."""
+    data = await request.body()
+    if not data:
+        raise HTTPException(400, "empty upload")
+    if len(data) > MAX_RECORDING_BYTES:
+        raise HTTPException(413, "recording too large")
+    device_name = _safe_label(urllib.parse.unquote(request.headers.get("X-Device-Name", "device")))
+    try:
+        volume = int(request.headers.get("X-Clip-Volume", "45"))
+    except ValueError:
+        volume = 45
+    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+    fname = f"{ts}_{device_name}.wav"
+    with open(os.path.join(RECORDINGS_DIR, fname), "wb") as f:
+        f.write(data)
+    _log.info("Attention recording saved: %s (%d bytes)", fname, len(data))
+    result = await _broadcast_clip(fname, volume)
+    return {"ok": True, "file": fname, **result}
+
+
+@app.get("/attention/list")
+async def attention_list() -> dict:
+    items = []
+    for name in os.listdir(RECORDINGS_DIR):
+        if not name.endswith(".wav"):
+            continue
+        try:
+            st = os.stat(os.path.join(RECORDINGS_DIR, name))
+        except OSError:
+            continue
+        dur = _wav_duration(os.path.join(RECORDINGS_DIR, name))
+        items.append({"name": name, "size": st.st_size, "mtime": st.st_mtime, "duration": dur, "url": f"/recordings/{name}"})
+    items.sort(key=lambda x: x["mtime"], reverse=True)
+    return {"recordings": items}
+
+
+class AttentionBroadcastReq(BaseModel):
+    file: str
+    volume: int = 45
+
+
+@app.post("/attention/broadcast")
+async def attention_broadcast(req: AttentionBroadcastReq) -> dict:
+    fname = os.path.basename(req.file)
+    if not fname.endswith(".wav") or not os.path.exists(os.path.join(RECORDINGS_DIR, fname)):
+        raise HTTPException(404, "recording not found")
+    result = await _broadcast_clip(fname, req.volume)
+    return {"ok": True, "file": fname, **result}
+
+
+@app.delete("/attention/{name}")
+async def attention_delete(name: str) -> dict:
+    fname = os.path.basename(name)
+    path = os.path.join(RECORDINGS_DIR, fname)
+    if not fname.endswith(".wav") or not os.path.exists(path):
+        raise HTTPException(404, "recording not found")
+    os.remove(path)
+    _log.info("Attention recording deleted: %s", fname)
+    return {"ok": True}
+
 
 @app.get("/")
 async def root():
@@ -678,6 +845,89 @@ async def dashboard():
     if STATE.last_error:
         error_html = f'<div class="alert">⚠ {html.escape(STATE.last_error)}</div>'
 
+    # Flight Log: recent announcements as compact line items (newest first).
+    def _fmt_size(n: int) -> str:
+        return f"{n / 1048576:.1f} MB" if n > 1048576 else f"{round(n / 1024)} KB"
+
+    recs = []
+    for rn in os.listdir(RECORDINGS_DIR):
+        if not rn.endswith(".wav"):
+            continue
+        try:
+            rst = os.stat(os.path.join(RECORDINGS_DIR, rn))
+        except OSError:
+            continue
+        dur = _wav_duration(os.path.join(RECORDINGS_DIR, rn))
+        recs.append((rn, rst.st_mtime, rst.st_size, dur))
+    recs.sort(key=lambda x: x[1], reverse=True)
+
+    announce_rows = ""
+    for rn, mtime, size, dur in recs:
+        when = datetime.datetime.fromtimestamp(mtime).strftime("%b %d · %H:%M:%S")
+        device = rn[:-4].split("_")[-1] or "device"  # filenames are safe-labeled
+        announce_rows += (
+            '<div class="rec-item">'
+            f'<span class="rtime">{html.escape(when)}</span>'
+            f'<span class="rdev">📣 {html.escape(device)}</span>'
+            f'<span class="rdur">{_fmt_duration(dur)}</span>'
+            f'<span class="rsize">{_fmt_size(size)}</span>'
+            '<span class="racts">'
+            f'<button class="dbtn cast" onclick="rebroadcast(this,\'{rn}\')">▶ Broadcast</button>'
+            f'<button class="dbtn del" onclick="delRec(this,\'{rn}\')">Delete</button>'
+            "</span></div>\n"
+        )
+    if not announce_rows:
+        announce_rows = '<div class="empty2">No announcements recorded yet.</div>'
+
+    dash_extra_css = (
+        ".dtabs{display:flex;gap:8px;margin-bottom:20px;}"
+        ".dtab{background:#161b22;border:1px solid #21262d;color:#8b949e;font-family:inherit;"
+        "font-size:11px;letter-spacing:0.2em;text-transform:uppercase;padding:8px 16px;border-radius:6px;cursor:pointer;}"
+        ".dtab.active{background:#1f2937;border-color:#f6dc83;color:#f6dc83;}"
+        ".rec-list{max-height:60vh;overflow-y:auto;border:1px solid #21262d;border-radius:6px;}"
+        ".rec-item{display:flex;align-items:center;gap:14px;padding:9px 14px;border-bottom:1px solid #161b22;}"
+        ".rec-item:last-child{border-bottom:none;}"
+        ".rec-item:hover{background:#161b22;}"
+        ".rtime{color:#8ab4f8;white-space:nowrap;width:150px;}"
+        ".rdev{flex:1;color:#c9d1d9;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+        ".rdur{color:#9d8bd6;width:52px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}"
+        ".rsize{color:#666;width:70px;text-align:right;white-space:nowrap;}"
+        ".racts{display:flex;gap:6px;flex:none;}"
+        ".dbtn{font-family:inherit;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 10px;"
+        "border-radius:5px;cursor:pointer;border:1px solid #21262d;}"
+        ".dbtn.cast{background:#1f7a3c;color:#d6ffe4;border-color:#2a9d54;}"
+        ".dbtn.cast:disabled{opacity:0.6;cursor:default;}"
+        ".dbtn.del{background:#3a1512;color:#ffb0a4;border-color:#7a1f14;}"
+        ".empty2{color:#555;text-align:center;padding:24px;}"
+    )
+
+    dash_script = """<script>
+      var reloadTimer;
+      function tab(name){
+        var ps=document.querySelectorAll('[data-panel]');
+        for(var i=0;i<ps.length;i++){ps[i].hidden=(ps[i].getAttribute('data-panel')!==name);}
+        var ts=document.querySelectorAll('.dtab');
+        for(var j=0;j<ts.length;j++){ts[j].classList.toggle('active', ts[j].getAttribute('data-tab')===name);}
+        try{localStorage.setItem('dash_tab',name);}catch(e){}
+        clearTimeout(reloadTimer);
+        if(name==='monitoring'){reloadTimer=setTimeout(function(){location.reload();},10000);}
+      }
+      async function rebroadcast(btn,name){
+        btn.disabled=true; var o=btn.textContent; btn.textContent='… casting';
+        try{
+          var r=await fetch('/attention/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:name})});
+          var d=await r.json().catch(function(){return {};});
+          btn.textContent = r.ok ? ('\\u2713 '+(d.played||0)+' spk') : '\\u2717 failed';
+        }catch(e){ btn.textContent='\\u2717 failed'; }
+        setTimeout(function(){ btn.textContent=o; btn.disabled=false; },2500);
+      }
+      async function delRec(btn,name){
+        if(!confirm('Delete this announcement?\\n'+name)) return;
+        try{ await fetch('/attention/'+encodeURIComponent(name),{method:'DELETE'}); btn.closest('.rec-item').remove(); }catch(e){}
+      }
+      (function(){ var t='monitoring'; try{t=localStorage.getItem('dash_tab')||'monitoring';}catch(e){} tab(t); })();
+    </script>"""
+
     page = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -702,25 +952,37 @@ async def dashboard():
   td.ms {{ word-break: break-word; }}
   td.empty {{ color: #555; text-align: center; padding: 20px; }}
   .refresh {{ color: #666; font-size: 10px; margin-top: 20px; }}
+  {dash_extra_css}
 </style>
-<meta http-equiv="refresh" content="10"/>
 </head>
 <body>
 <a class="back" href="/">← Console</a>
 <h1>SONOS DASHBOARD</h1>
-<div class="sub">Monitoring · Auto-refreshes every 10s</div>
+<div class="sub">Monitoring · Flight Log</div>
 {error_html}
-<h2>Devices</h2>
-<table>
-  <tr><th>Name</th><th>IP</th><th>Status</th><th>Volume</th></tr>
-  {device_rows}
-</table>
-<h2>Event Log</h2>
-<table>
-  <tr><th>Time</th><th>Level</th><th>Message</th></tr>
-  {rows}
-</table>
-<div class="refresh">Last rendered: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} · {len(_log_ring)} events in buffer</div>
+<div class="dtabs">
+  <button class="dtab" data-tab="monitoring" onclick="tab('monitoring')">Monitoring</button>
+  <button class="dtab" data-tab="flightlog" onclick="tab('flightlog')">✈ Flight Log</button>
+</div>
+<div data-panel="monitoring">
+  <h2>Devices</h2>
+  <table>
+    <tr><th>Name</th><th>IP</th><th>Status</th><th>Volume</th></tr>
+    {device_rows}
+  </table>
+  <h2>Event Log</h2>
+  <table>
+    <tr><th>Time</th><th>Level</th><th>Message</th></tr>
+    {rows}
+  </table>
+  <div class="refresh">Last rendered: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")} · {len(_log_ring)} events in buffer · auto-refreshes every 10s</div>
+</div>
+<div data-panel="flightlog" hidden>
+  <h2>Recent Announcements</h2>
+  <div class="rec-list">{announce_rows}</div>
+  <div class="refresh">{len(recs)} announcement(s) · newest first</div>
+</div>
+{dash_script}
 </body>
 </html>"""
     return HTMLResponse(page)

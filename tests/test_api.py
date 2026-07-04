@@ -67,6 +67,30 @@ class TestValidation:
         assert r.status_code == 422
 
 
+class TestAttention:
+    """Side-effect-free checks only — never uploads/broadcasts (would play audio on real speakers)."""
+
+    def test_state_exposes_https_port(self, client):
+        assert "https_port" in client.get("/state").json()
+
+    def test_list_returns_recordings_array(self, client):
+        r = client.get("/attention/list")
+        assert r.status_code == 200
+        assert isinstance(r.json()["recordings"], list)
+
+    def test_broadcast_missing_file_returns_404(self, client):
+        r = client.post("/attention/broadcast", json={"file": "does-not-exist.wav", "volume": 40})
+        assert r.status_code == 404
+
+    def test_delete_missing_file_returns_404(self, client):
+        r = client.request("DELETE", "/attention/does-not-exist.wav")
+        assert r.status_code == 404
+
+    def test_delete_rejects_path_traversal(self, client):
+        r = client.request("DELETE", "/attention/..%2Fapp.py")
+        assert r.status_code == 404
+
+
 class TestUnknownDevice:
     def test_volume_unknown_uuid_returns_404(self, client):
         r = client.post("/volume", json={"uuid": "nonexistent-device-uuid", "volume": 50})
