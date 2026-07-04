@@ -1,14 +1,12 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:    # manual trigger only — go to Actions tab and click "Run workflow"
 
 jobs:
   deploy-production:
     name: Deploy (Production)
     runs-on: self-hosted
-    environment: production    # pauses here until manually approved on GitHub
 
     steps:
       - name: Checkout code
