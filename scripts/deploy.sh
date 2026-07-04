@@ -23,10 +23,25 @@ case "$ENV" in
 esac
 
 RUNNER_WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
+RELEASES_DIR="$HOME/sonos-releases/$ENV"
 
 echo "==> Deploying to $ENV ($DEPLOY_DIR, port $PORT)"
 
-# 1. Sync code (exclude venv, logs, git internals)
+# 1. Snapshot current deployment before overwriting (production only)
+if [ "$ENV" = "production" ] && [ -d "$DEPLOY_DIR/app.py" -o -f "$DEPLOY_DIR/app.py" ]; then
+  SNAPSHOT="$RELEASES_DIR/$(date +%Y%m%d_%H%M%S)"
+  mkdir -p "$SNAPSHOT"
+  rsync -a \
+    --exclude='.git/' --exclude='.venv/' \
+    --exclude='__pycache__/' --exclude='*.log' \
+    "$DEPLOY_DIR/" "$SNAPSHOT/"
+  echo "==> Snapshot saved → $SNAPSHOT"
+  # Keep only the 3 most recent snapshots
+  ls -dt "$RELEASES_DIR"/*/  2>/dev/null | tail -n +4 | xargs rm -rf
+  echo "==> Releases kept: $(ls "$RELEASES_DIR" | wc -l | tr -d ' ')"
+fi
+
+# 2. Sync code (exclude venv, logs, git internals)
 rsync -a --delete \
   --exclude='.git/' \
   --exclude='.venv/' \
@@ -35,7 +50,7 @@ rsync -a --delete \
   --exclude='.pytest_cache/' \
   "$RUNNER_WORKSPACE/" "$DEPLOY_DIR/"
 
-# 2. Recreate run_server.sh (env-specific, not in git)
+# 3. Recreate run_server.sh (env-specific, not in git)
 cat > "$DEPLOY_DIR/run_server.sh" << SCRIPT
 #!/bin/bash
 cd $DEPLOY_DIR
