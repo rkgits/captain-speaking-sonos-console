@@ -196,9 +196,11 @@ def classify(uri: str) -> str:
 
 
 async def get_transport(client: httpx.AsyncClient, ip: str) -> dict[str, Any]:
-    ti = await soap(client, ip, AV_PATH, AV_SVC, "GetTransportInfo", "<InstanceID>0</InstanceID>")
-    mi = await soap(client, ip, AV_PATH, AV_SVC, "GetMediaInfo", "<InstanceID>0</InstanceID>")
-    pi = await soap(client, ip, AV_PATH, AV_SVC, "GetPositionInfo", "<InstanceID>0</InstanceID>")
+    ti, mi, pi = await asyncio.gather(
+        soap(client, ip, AV_PATH, AV_SVC, "GetTransportInfo", "<InstanceID>0</InstanceID>"),
+        soap(client, ip, AV_PATH, AV_SVC, "GetMediaInfo", "<InstanceID>0</InstanceID>"),
+        soap(client, ip, AV_PATH, AV_SVC, "GetPositionInfo", "<InstanceID>0</InstanceID>"),
+    )
     raw_pi = html.unescape(html.unescape(pi))
     state = tag(ti, "CurrentTransportState")
     uri = tag(mi, "CurrentURI") or ""
@@ -541,26 +543,44 @@ async def api_leave(req: LeaveReq) -> dict:
     return {"ok": True}
 
 
+def _transport_error(action: str, e: Exception) -> HTTPException:
+    msg = str(e)
+    # Extract Sonos UPnP error description if present
+    m = re.search(r"<errorDescription>([^<]+)</errorDescription>", msg)
+    detail = m.group(1) if m else msg[:120]
+    _log.warning("%s failed: %s", action, detail)
+    return HTTPException(503, f"{action} failed: {detail}")
+
+
 @app.post("/play")
 async def api_play(req: CoordReq) -> dict:
-    async with httpx.AsyncClient() as c:
-        await do_play(c, _ip(req.coordinator_uuid))
+    try:
+        async with httpx.AsyncClient() as c:
+            await do_play(c, _ip(req.coordinator_uuid))
+    except Exception as e:
+        raise _transport_error("Play", e)
     transport = await refresh_coordinator(req.coordinator_uuid)
     return {"ok": True, "transport": transport}
 
 
 @app.post("/pause")
 async def api_pause(req: CoordReq) -> dict:
-    async with httpx.AsyncClient() as c:
-        await do_pause(c, _ip(req.coordinator_uuid))
+    try:
+        async with httpx.AsyncClient() as c:
+            await do_pause(c, _ip(req.coordinator_uuid))
+    except Exception as e:
+        raise _transport_error("Pause", e)
     transport = await refresh_coordinator(req.coordinator_uuid)
     return {"ok": True, "transport": transport}
 
 
 @app.post("/next")
 async def api_next(req: CoordReq) -> dict:
-    async with httpx.AsyncClient() as c:
-        await do_next(c, _ip(req.coordinator_uuid))
+    try:
+        async with httpx.AsyncClient() as c:
+            await do_next(c, _ip(req.coordinator_uuid))
+    except Exception as e:
+        raise _transport_error("Next", e)
     await asyncio.sleep(0.15)
     transport = await refresh_coordinator(req.coordinator_uuid)
     return {"ok": True, "transport": transport}
@@ -568,8 +588,11 @@ async def api_next(req: CoordReq) -> dict:
 
 @app.post("/prev")
 async def api_prev(req: CoordReq) -> dict:
-    async with httpx.AsyncClient() as c:
-        await do_prev(c, _ip(req.coordinator_uuid))
+    try:
+        async with httpx.AsyncClient() as c:
+            await do_prev(c, _ip(req.coordinator_uuid))
+    except Exception as e:
+        raise _transport_error("Prev", e)
     await asyncio.sleep(0.15)
     transport = await refresh_coordinator(req.coordinator_uuid)
     return {"ok": True, "transport": transport}
