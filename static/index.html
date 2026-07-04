@@ -1121,8 +1121,13 @@
       btn.addEventListener('click', async () => {
         const a = btn.dataset.tAction;
         btn.disabled = true;
-        await apiPost('/' + a, {coordinator_uuid: coord});
-        setTimeout(refresh, 250);
+        const result = await apiPost('/' + a, {coordinator_uuid: coord});
+        if (result?.transport) {
+          latest.transport[coord] = result.transport;
+          if (!activeDrag) render();
+        }
+        btn.disabled = false;
+        setTimeout(refresh, 1500);
       });
     }
   }
@@ -1213,8 +1218,26 @@
   }
 
   refresh();
-  setInterval(refresh, 5000);        // sync with speakers every 5s
+  setInterval(refresh, 30000);       // fallback poll for volume/topology (SSE handles transport)
   setInterval(tickProgress, 500);    // smooth elapsed tick
+
+  // ---- SSE push subscription ----
+  function connectSSE() {
+    const es = new EventSource(API_BASE + '/events');
+    es.onmessage = (e) => {
+      try {
+        latest = JSON.parse(e.data);
+        errorBar.classList.toggle('show', !!latest.last_error);
+        errorBar.textContent = latest.last_error || '';
+        if (!activeDrag) render();
+      } catch (_) {}
+    };
+    es.onerror = () => {
+      es.close();
+      setTimeout(connectSSE, 3000);
+    };
+  }
+  connectSSE();
 })();
 </script>
 </body>

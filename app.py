@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import html
+import json
 import os
 import re
 import subprocess
@@ -14,7 +15,7 @@ from typing import Any
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -43,6 +44,8 @@ class State:
 
 
 STATE = State()
+_sse_clients: set[asyncio.Queue] = set()
+
 app = FastAPI(title="Sonos Wooden Console")
 app.add_middleware(
     CORSMiddleware,
@@ -307,6 +310,7 @@ async def find_seed(client: httpx.AsyncClient) -> str | None:
 
 # ---------- Refresh loop ----------
 async def refresh_state() -> None:
+    transport_before = {k: (v.get("title"), v.get("state")) for k, v in STATE.transport.items()}
     async with httpx.AsyncClient() as client:
         seed = await find_seed(client)
         if not seed:
@@ -369,6 +373,11 @@ async def refresh_state() -> None:
             if k not in live_coords:
                 del STATE.group_volumes[k]
 
+        # Broadcast to SSE clients if track or play state changed
+        transport_after = {k: (v.get("title"), v.get("state")) for k, v in STATE.transport.items()}
+        if transport_before != transport_after:
+            _broadcast_state()
+
 
 async def refresh_loop() -> None:
     while True:
@@ -382,6 +391,46 @@ async def refresh_loop() -> None:
 @app.on_event("startup")
 async def on_startup() -> None:
     asyncio.create_task(refresh_loop())
+
+
+# ---------- SSE push ----------
+def _sse_snapshot() -> str:
+    payload = {
+        "devices": STATE.devices,
+        "groups": STATE.groups,
+        "transport": STATE.transport,
+        "volumes": STATE.volumes,
+        "group_volumes": STATE.group_volumes,
+        "last_error": STATE.last_error,
+    }
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+def _broadcast_state() -> None:
+    if not _sse_clients:
+        return
+    snapshot = _sse_snapshot()
+    dead = set()
+    for q in _sse_clients:
+        try:
+            q.put_nowait(snapshot)
+        except asyncio.QueueFull:
+            dead.add(q)
+    _sse_clients.difference_update(dead)
+
+
+async def refresh_coordinator(coord_uuid: str) -> dict | None:
+    """Re-fetch transport state for one coordinator immediately after a command."""
+    dev = STATE.devices.get(coord_uuid)
+    if not dev:
+        return None
+    try:
+        async with httpx.AsyncClient() as client:
+            transport = await get_transport(client, dev["ip"])
+        STATE.transport[coord_uuid] = transport
+        return transport
+    except Exception:
+        return None
 
 
 # ---------- API ----------
@@ -466,28 +515,59 @@ async def api_leave(req: LeaveReq) -> dict:
 async def api_play(req: CoordReq) -> dict:
     async with httpx.AsyncClient() as c:
         await do_play(c, _ip(req.coordinator_uuid))
-    return {"ok": True}
+    transport = await refresh_coordinator(req.coordinator_uuid)
+    return {"ok": True, "transport": transport}
 
 
 @app.post("/pause")
 async def api_pause(req: CoordReq) -> dict:
     async with httpx.AsyncClient() as c:
         await do_pause(c, _ip(req.coordinator_uuid))
-    return {"ok": True}
+    transport = await refresh_coordinator(req.coordinator_uuid)
+    return {"ok": True, "transport": transport}
 
 
 @app.post("/next")
 async def api_next(req: CoordReq) -> dict:
     async with httpx.AsyncClient() as c:
         await do_next(c, _ip(req.coordinator_uuid))
-    return {"ok": True}
+    await asyncio.sleep(0.15)
+    transport = await refresh_coordinator(req.coordinator_uuid)
+    return {"ok": True, "transport": transport}
 
 
 @app.post("/prev")
 async def api_prev(req: CoordReq) -> dict:
     async with httpx.AsyncClient() as c:
         await do_prev(c, _ip(req.coordinator_uuid))
-    return {"ok": True}
+    await asyncio.sleep(0.15)
+    transport = await refresh_coordinator(req.coordinator_uuid)
+    return {"ok": True, "transport": transport}
+
+
+@app.get("/events")
+async def api_events():
+    """SSE endpoint — pushes state snapshots when transport changes."""
+    q: asyncio.Queue[str] = asyncio.Queue(maxsize=5)
+    _sse_clients.add(q)
+
+    async def event_generator():
+        yield _sse_snapshot()
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(q.get(), timeout=30.0)
+                    yield msg
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            _sse_clients.discard(q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/group-volume")
