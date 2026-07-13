@@ -1193,7 +1193,7 @@
           ${t.artist ? `<div class="artist">${escapeHTML(t.artist)}</div>` : ''}
           ${t.album ? `<div class="album">${escapeHTML(t.album)}</div>` : ''}
           ${showProgress ? `
-            <div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:${pct}%"></div></div>
+            <div class="progress-track"><div class="progress-fill" id="progress-fill" style="transform:scaleX(${Math.max(0, Math.min(1, pct / 100))})"></div></div>
             <div class="progress-times">
               <span id="elapsed-time">${fmtTime(elapsedS)}</span>
               <span>${fmtTime(durationS)}</span>
