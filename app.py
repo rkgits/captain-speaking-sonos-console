@@ -880,32 +880,66 @@ async def dashboard():
         announce_rows = '<div class="empty2">No announcements recorded yet.</div>'
 
     dash_extra_css = (
-        ".dtabs{display:flex;gap:8px;margin-bottom:20px;}"
-        ".dtab{background:#161b22;border:1px solid #21262d;color:#8b949e;font-family:inherit;"
-        "font-size:11px;letter-spacing:0.2em;text-transform:uppercase;padding:8px 16px;border-radius:6px;cursor:pointer;}"
-        ".dtab.active{background:#1f2937;border-color:#f6dc83;color:#f6dc83;}"
-        ".rec-list{max-height:60vh;overflow-y:auto;border:1px solid #21262d;border-radius:6px;}"
-        ".rec-item{display:flex;align-items:center;gap:14px;padding:9px 14px;border-bottom:1px solid #161b22;}"
+        ".dtabs{display:flex;gap:6px;margin-bottom:20px;}"
+        ".dtab{font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;"
+        "padding:9px 20px;cursor:pointer;color:var(--parchment);"
+        "background:linear-gradient(180deg,#3a2211,#241207);border:1px solid var(--ink);border-radius:7px;"
+        "box-shadow:inset 0 1px 0 rgba(255,200,140,0.08);opacity:0.75;"
+        "transition:transform var(--dur-press) var(--ease-out),opacity var(--dur-press) var(--ease-out);}"
+        ".dtab.active{color:var(--ink);opacity:1;"
+        "background:linear-gradient(180deg,var(--brass-hi),var(--brass-mid) 70%,var(--brass-lo));"
+        "box-shadow:inset 0 1px 0 rgba(255,240,180,0.7),0 4px 12px rgba(0,0,0,0.4);}"
+        ".dtab:focus-visible{outline:2px solid var(--brass-hi);outline-offset:3px;}"
+        "@media (hover:hover) and (pointer:fine){.dtab:hover{opacity:1;}}"
+        ".rec-list{max-height:60vh;overflow-y:auto;border:1px solid var(--ink);border-radius:8px;"
+        "background:linear-gradient(180deg,#3a2211,#241207);box-shadow:var(--bevel-inset);}"
+        ".rec-item{display:flex;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,0.35);"
+        "animation:row-in var(--dur-base) var(--ease-out) both;}"
         ".rec-item:last-child{border-bottom:none;}"
-        ".rec-item:hover{background:#161b22;}"
-        ".rtime{color:#8ab4f8;white-space:nowrap;width:150px;}"
-        ".rdev{flex:1;color:#c9d1d9;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
-        ".rdur{color:#9d8bd6;width:52px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}"
-        ".rsize{color:#666;width:70px;text-align:right;white-space:nowrap;}"
+        ".rec-item:nth-child(2){animation-delay:40ms;}.rec-item:nth-child(3){animation-delay:80ms;}"
+        ".rec-item:nth-child(4){animation-delay:120ms;}.rec-item:nth-child(5){animation-delay:160ms;}"
+        ".rec-item:nth-child(n+6){animation-delay:200ms;}"
+        "@keyframes row-in{from{opacity:0;transform:translateY(6px);}}"
+        ".rec-item[data-leaving]{opacity:0;transform:translateY(-4px);"
+        "transition:opacity var(--dur-fast) var(--ease-out),transform var(--dur-fast) var(--ease-out);}"
+        "@media (hover:hover) and (pointer:fine){.rec-item:hover{background:rgba(246,220,131,0.06);}}"
+        ".rtime{color:var(--brass-mid);white-space:nowrap;width:170px;font-variant-numeric:tabular-nums;}"
+        ".rdev{flex:1;color:var(--cream);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+        ".rdur{color:var(--brass-hi);width:52px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}"
+        ".rsize{color:var(--parchment);opacity:0.7;width:70px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}"
         ".racts{display:flex;gap:6px;flex:none;}"
-        ".dbtn{font-family:inherit;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;padding:6px 10px;"
-        "border-radius:5px;cursor:pointer;border:1px solid #21262d;}"
-        ".dbtn.cast{background:#1f7a3c;color:#d6ffe4;border-color:#2a9d54;}"
+        ".dbtn{font-family:'Courier New',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;"
+        "font-weight:bold;padding:6px 11px;border-radius:5px;cursor:pointer;border:1px solid var(--ink);color:var(--ink);"
+        "box-shadow:var(--bevel-raised);"
+        "transition:transform var(--dur-press) var(--ease-out),box-shadow var(--dur-press) var(--ease-out);}"
+        ".dbtn:active{transform:translateY(1px);}"
+        ".dbtn:focus-visible{outline:2px solid var(--brass-hi);outline-offset:3px;}"
+        ".dbtn.cast{background:linear-gradient(180deg,#86c88a,#2c6b30);color:#0e2b12;}"
         ".dbtn.cast:disabled{opacity:0.6;cursor:default;}"
-        ".dbtn.del{background:#3a1512;color:#ffb0a4;border-color:#7a1f14;}"
-        ".empty2{color:#555;text-align:center;padding:24px;}"
+        ".dbtn.del{background:linear-gradient(180deg,#c47a5a,#7a1f14);color:#ffe4d8;}"
+        ".empty2{color:var(--parchment);opacity:0.6;text-align:center;padding:24px;font-style:italic;}"
     )
 
     dash_script = """<script>
       var reloadTimer;
+      function toast(msg,kind,ms){
+        var wrap=document.getElementById('toast-wrap'); if(!wrap) return;
+        var el=document.createElement('div'); el.className='toast '+(kind||'');
+        el.textContent=msg; el.style.opacity='0'; el.style.transform='translateY(16px)';
+        wrap.appendChild(el);
+        requestAnimationFrame(function(){ el.style.opacity=''; el.style.transform=''; });
+        var timer=setTimeout(leave, ms||3400);
+        function leave(){ el.setAttribute('data-leaving',''); setTimeout(function(){ el.remove(); },300); }
+        el.addEventListener('mouseenter',function(){ clearTimeout(timer); });
+        el.addEventListener('mouseleave',function(){ timer=setTimeout(leave,1400); });
+      }
       function tab(name){
         var ps=document.querySelectorAll('[data-panel]');
-        for(var i=0;i<ps.length;i++){ps[i].hidden=(ps[i].getAttribute('data-panel')!==name);}
+        for(var i=0;i<ps.length;i++){
+          var show=ps[i].getAttribute('data-panel')===name;
+          ps[i].hidden=!show;
+          if(show){ ps[i].classList.remove('entering'); void ps[i].offsetWidth; ps[i].classList.add('entering'); }
+        }
         var ts=document.querySelectorAll('.dtab');
         for(var j=0;j<ts.length;j++){ts[j].classList.toggle('active', ts[j].getAttribute('data-tab')===name);}
         try{localStorage.setItem('dash_tab',name);}catch(e){}
@@ -917,13 +951,19 @@ async def dashboard():
         try{
           var r=await fetch('/attention/broadcast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:name})});
           var d=await r.json().catch(function(){return {};});
-          btn.textContent = r.ok ? ('\\u2713 '+(d.played||0)+' spk') : '\\u2717 failed';
-        }catch(e){ btn.textContent='\\u2717 failed'; }
+          if(r.ok){ btn.textContent='\\u2713 '+(d.played||0)+' spk'; toast('\\u2713 Broadcast to '+(d.played||0)+' speakers','ok'); }
+          else { btn.textContent='\\u2717 failed'; toast('\\u2717 Broadcast failed','err'); }
+        }catch(e){ btn.textContent='\\u2717 failed'; toast('\\u2717 Broadcast failed','err'); }
         setTimeout(function(){ btn.textContent=o; btn.disabled=false; },2500);
       }
       async function delRec(btn,name){
         if(!confirm('Delete this announcement?\\n'+name)) return;
-        try{ await fetch('/attention/'+encodeURIComponent(name),{method:'DELETE'}); btn.closest('.rec-item').remove(); }catch(e){}
+        try{
+          await fetch('/attention/'+encodeURIComponent(name),{method:'DELETE'});
+          var row=btn.closest('.rec-item');
+          row.setAttribute('data-leaving',''); setTimeout(function(){ row.remove(); },200);
+          toast('\\ud83d\\uddd1 Announcement deleted','ok');
+        }catch(e){ toast('\\u2717 Delete failed','err'); }
       }
       (function(){ var t='monitoring'; try{t=localStorage.getItem('dash_tab')||'monitoring';}catch(e){} tab(t); })();
     </script>"""
@@ -935,23 +975,54 @@ async def dashboard():
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Sonos Dashboard</title>
 <style>
+  :root {{
+    --wood-dark:#2b1608; --wood-mid:#4a2a14; --wood-lite:#6b3b1c;
+    --brass-hi:#f6dc83; --brass-mid:#c39a3a; --brass-lo:#6b4a08;
+    --cream:#f4e0b8; --parchment:#d9b781; --ink:#1a0d05;
+    --led-green:#45e07a; --led-red:#ff4a3d; --led-amber:#ffb84a;
+    --ease-out:cubic-bezier(0.23,1,0.32,1); --ease-in-out:cubic-bezier(0.77,0,0.175,1);
+    --dur-press:140ms; --dur-fast:180ms; --dur-base:240ms;
+    --bevel-raised:inset 0 1px 0 rgba(255,240,180,0.6),inset 0 -2px 2px rgba(0,0,0,0.35),0 2px 4px rgba(0,0,0,0.4);
+    --bevel-inset:inset 0 2px 3px rgba(0,0,0,0.5);
+  }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ background: #0d1117; color: #c9d1d9; font-family: "Courier New", monospace; font-size: 13px; padding: 24px; }}
-  h1 {{ color: #f6dc83; letter-spacing: 0.3em; font-size: 18px; margin-bottom: 4px; }}
-  .sub {{ color: #666; font-size: 11px; letter-spacing: 0.2em; margin-bottom: 24px; }}
-  .back {{ color: #8ab4f8; text-decoration: none; font-size: 11px; float: right; margin-top: 4px; }}
-  .back:hover {{ color: #f6dc83; }}
-  .alert {{ background: rgba(255,80,80,0.15); border: 1px solid #ff5f5f; color: #ff5f5f; padding: 10px 14px; border-radius: 4px; margin-bottom: 20px; }}
-  h2 {{ color: #8ab4f8; font-size: 12px; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 10px; margin-top: 28px; border-bottom: 1px solid #21262d; padding-bottom: 6px; }}
+  body {{
+    color: var(--cream); font-family: "Georgia","Times New Roman",serif; font-size: 14px;
+    padding: 28px 24px 60px; min-height: 100vh; max-width: 1100px; margin: 0 auto;
+    background-color: var(--wood-mid);
+    background-image:
+      radial-gradient(ellipse at 50% 15%, rgba(200,140,70,0.35), transparent 60%),
+      radial-gradient(ellipse at 20% 80%, rgba(255,180,110,0.15), transparent 55%),
+      repeating-linear-gradient(89deg, rgba(20,10,5,0.35) 0, rgba(20,10,5,0.35) 1px, transparent 1px, transparent 4px, rgba(20,10,5,0.18) 4px, rgba(20,10,5,0.18) 5px, transparent 5px, transparent 11px, rgba(20,10,5,0.28) 11px, rgba(20,10,5,0.28) 12px, transparent 12px, transparent 22px),
+      linear-gradient(180deg, var(--wood-mid), var(--wood-dark));
+    background-attachment: fixed;
+  }}
+  h1 {{ font-family:"Georgia",serif; color: var(--brass-hi); letter-spacing: 0.22em; font-size: 22px; margin-bottom: 4px;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.5), 0 0 14px rgba(246,220,131,0.35); }}
+  .sub {{ color: var(--parchment); font-family:"Courier New",monospace; font-size: 11px; letter-spacing: 0.2em; margin-bottom: 24px; opacity: 0.8; }}
+  .back {{ color: var(--brass-hi); text-decoration: none; font-family:"Courier New",monospace; font-size: 11px; letter-spacing: 0.15em; float: right; margin-top: 6px; }}
+  .back:focus-visible {{ outline: 2px solid var(--brass-hi); outline-offset: 3px; }}
+  @media (hover:hover) and (pointer:fine) {{ .back:hover {{ color: var(--cream); }} }}
+  .alert {{ background: rgba(180,40,30,0.35); border: 1px solid #6b1b12; color: #ffd0c8; padding: 10px 14px; border-radius: 6px; margin-bottom: 20px; font-family:"Courier New",monospace; }}
+  h2 {{ color: var(--brass-mid); font-family:"Courier New",monospace; font-size: 12px; letter-spacing: 0.28em; text-transform: uppercase; margin: 28px 0 10px; border-bottom: 1px solid rgba(246,220,131,0.25); padding-bottom: 6px; }}
   table {{ width: 100%; border-collapse: collapse; }}
-  th {{ text-align: left; color: #8ab4f8; font-size: 11px; letter-spacing: 0.2em; padding: 6px 10px; border-bottom: 1px solid #21262d; }}
-  td {{ padding: 5px 10px; border-bottom: 1px solid #161b22; vertical-align: top; }}
-  tr:hover td {{ background: #161b22; }}
-  td.ts {{ color: #666; white-space: nowrap; width: 150px; }}
+  th {{ text-align: left; color: var(--brass-mid); font-family:"Courier New",monospace; font-size: 11px; letter-spacing: 0.18em; padding: 6px 10px; border-bottom: 1px solid rgba(246,220,131,0.25); }}
+  td {{ padding: 6px 10px; border-bottom: 1px solid rgba(0,0,0,0.3); vertical-align: top; font-family:"Courier New",monospace; font-size: 12px; color: var(--cream); }}
+  @media (hover:hover) and (pointer:fine) {{ tr:hover td {{ background: rgba(246,220,131,0.06); }} }}
+  td.ts {{ color: var(--parchment); opacity: 0.8; white-space: nowrap; width: 150px; font-variant-numeric: tabular-nums; }}
   td.lv {{ font-weight: bold; width: 80px; white-space: nowrap; }}
   td.ms {{ word-break: break-word; }}
-  td.empty {{ color: #555; text-align: center; padding: 20px; }}
-  .refresh {{ color: #666; font-size: 10px; margin-top: 20px; }}
+  td.empty {{ color: var(--parchment); opacity: 0.6; text-align: center; padding: 20px; font-style: italic; }}
+  .refresh {{ color: var(--parchment); opacity: 0.6; font-family:"Courier New",monospace; font-size: 10px; letter-spacing: 0.1em; margin-top: 20px; }}
+  [data-panel][hidden] {{ display: none; }}
+  [data-panel].entering {{ animation: view-in var(--dur-fast) var(--ease-out); }}
+  @keyframes view-in {{ from {{ opacity: 0; transform: translateY(4px); }} }}
+  .toast-wrap {{ position: fixed; left:0; right:0; bottom:22px; z-index:9999; display:flex; flex-direction:column; align-items:center; gap:10px; pointer-events:none; padding:0 12px; }}
+  .toast {{ pointer-events:auto; min-width:220px; max-width:92vw; padding:11px 16px; border-radius:8px; font-family:"Courier New",monospace; font-size:12px; letter-spacing:0.04em; color:var(--cream); background:linear-gradient(180deg,#4a2810,#2b1608); border:1px solid var(--ink); box-shadow:var(--bevel-raised),0 8px 24px rgba(0,0,0,0.5); transition:opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out); }}
+  .toast.ok {{ border-color:#2c6b30; }}
+  .toast.err {{ border-color:#7a1f14; color:#ffd9d0; }}
+  .toast[data-leaving] {{ opacity:0; transform:translateY(10px); }}
+  @media (prefers-reduced-motion: reduce) {{ [data-panel].entering, .rec-item {{ animation: none !important; }} .toast {{ transition-duration: 1ms; }} }}
   {dash_extra_css}
 </style>
 </head>
@@ -982,6 +1053,7 @@ async def dashboard():
   <div class="rec-list">{announce_rows}</div>
   <div class="refresh">{len(recs)} announcement(s) · newest first</div>
 </div>
+<div id="toast-wrap" class="toast-wrap"></div>
 {dash_script}
 </body>
 </html>"""
