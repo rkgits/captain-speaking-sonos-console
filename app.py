@@ -1,6 +1,6 @@
 """
-Sonos wooden-panel console — local web app.
-Run: uvicorn app:app --host 127.0.0.1 --port 8787
+Captain Speaking — a vintage-style local web console for Sonos speakers.
+Run: uvicorn app:app --host 0.0.0.0 --port 8787
 """
 from __future__ import annotations
 
@@ -24,6 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+VERSION = "1.0.0"
 
 SOAP_TIMEOUT = 4.0
 REFRESH_INTERVAL = 2.0
@@ -71,14 +73,14 @@ class _RingHandler(logging.Handler):
             "msg": self.format(record),
         })
 
-_log = logging.getLogger("sonos")
+_log = logging.getLogger("captain-speaking")
 _log.setLevel(logging.DEBUG)
 _rh = _RingHandler()
 _rh.setFormatter(logging.Formatter("%(message)s"))
 _log.addHandler(_rh)
 _log.propagate = False
 
-app = FastAPI(title="Sonos Wooden Console")
+app = FastAPI(title="Captain Speaking", version=VERSION)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -486,6 +488,7 @@ def _sse_snapshot() -> str:
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
         "https_port": HTTPS_PORT,
+        "version": VERSION,
     }
     return f"data: {json.dumps(payload)}\n\n"
 
@@ -563,6 +566,7 @@ async def api_state() -> dict:
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
         "https_port": HTTPS_PORT,
+        "version": VERSION,
     }
 
 
@@ -1005,7 +1009,7 @@ async def dashboard():
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Sonos Dashboard</title>
+<title>Captain Speaking · Dashboard</title>
 <style>
   :root {{
     --wood-dark:#2b1608; --wood-mid:#4a2a14; --wood-lite:#6b3b1c;
@@ -1060,8 +1064,8 @@ async def dashboard():
 </head>
 <body>
 <a class="back" href="/">← Console</a>
-<h1>SONOS DASHBOARD</h1>
-<div class="sub">Monitoring · Flight Log</div>
+<h1>CAPTAIN SPEAKING</h1>
+<div class="sub">Dashboard · Monitoring · Flight Log</div>
 {error_html}
 <div class="dtabs">
   <button class="dtab" data-tab="monitoring" onclick="tab('monitoring')">Monitoring</button>

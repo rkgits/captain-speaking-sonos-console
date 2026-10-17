@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sonos Console</title>
+<title>Captain Speaking</title>
 <style>
   :root {
     --wood-dark:  #2b1608;
@@ -947,8 +947,8 @@
     <div class="screw bl"></div>
     <div class="screw br"></div>
     <a class="dash-link" href="/dashboard">⬡ Dashboard</a>
-    <h1>SONOS CONSOLE</h1>
-    <div class="sub">Vintage Series · Model MMXXVI</div>
+    <h1>CAPTAIN SPEAKING</h1>
+    <div class="sub">Vintage Series · Model MMXXVI · <span id="app-version">v1.0</span></div>
   </div>
 
   <div class="tabs">
@@ -1330,6 +1330,8 @@
   }
 
   function render() {
+    const ver = $('app-version');
+    if (ver && latest.version) ver.textContent = 'v' + latest.version.split('.').slice(0, 2).join('.');
     renderNow();
     const groups = latest.groups || [];
     const devices = latest.devices || {};

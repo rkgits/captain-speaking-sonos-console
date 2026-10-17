@@ -1,5 +1,5 @@
 """
-API contract tests for the Sonos app.
+API contract tests for Captain Speaking.
 These run against a live server (staging or production) and do NOT require
 Sonos hardware to be reachable — they test the HTTP API contract only.
 
