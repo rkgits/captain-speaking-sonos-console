@@ -107,3 +107,9 @@ class TestUnknownDevice:
     def test_mute_unknown_uuid_returns_404(self, client):
         r = client.post("/mute", json={"uuid": "nonexistent-uuid", "muted": True})
         assert r.status_code == 404
+
+
+class TestAlbumArt:
+    def test_art_unknown_uuid_returns_404(self, client):
+        r = client.get("/art/nonexistent-uuid")
+        assert r.status_code == 404

@@ -11,7 +11,7 @@ When music is playing, you can't tell who started it or what's on. To turn the v
 - 🔊 **Volume for every speaker**, one slider each, plus a group volume.
 - 🔇 **Mute and unmute** any speaker.
 - 🔗 **Add or remove speakers** from whatever is playing, so a room can join or leave the music in one tap.
-- ▶️ **See what's playing** on each group (AirPlay, Spotify and more), with play, pause, next and previous.
+- ▶️ **See what's playing** on each group (AirPlay, Spotify and more), with album artwork, a vintage level-meter visualizer, and play, pause, next and previous.
 - 📣 **Voice announcements on all your speakers at once.** The fun part.
 
 ### The announcement feature (Attention / Flight Attendant tab)
