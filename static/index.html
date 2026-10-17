@@ -555,11 +555,15 @@
     background: radial-gradient(circle at 35% 28%, #d8ffe3, var(--led-green) 50%, #0f5a22);
     box-shadow: 0 0 0 3px #b8892f, 0 0 0 4px var(--ink), 0 0 14px 2px rgba(69,224,122,0.7), inset 0 -2px 4px rgba(0,0,0,0.35);
   }
-  .lamp.red.on .lens {
-    color: rgba(70,8,0,0.8);
-    background: radial-gradient(circle at 35% 28%, #ffd6cf, var(--led-red) 50%, #6b1b12);
-    box-shadow: 0 0 0 3px #b8892f, 0 0 0 4px var(--ink), 0 0 14px 2px rgba(255,74,61,0.7), inset 0 -2px 4px rgba(0,0,0,0.35);
+  .mute-sign {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    font-family: "Courier New", monospace; font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(244,224,184,0.45); cursor: default; user-select: none;
+    transition: color var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out);
   }
+  .mute-sign svg { width: 28px; height: 28px; color: rgba(255,255,255,0.18); transition: color var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
+  .mute-sign.on { color: var(--led-red); }
+  .mute-sign.on svg { color: var(--led-red); filter: drop-shadow(0 0 5px rgba(255,74,61,0.8)); }
 
   /* --- Fader --- */
   .fader-wrap {
@@ -840,31 +844,26 @@
     font-size: 11px; text-decoration: underline; font-family: inherit; }
   .vol-wrap { margin-bottom: 22px; }
   .chime-wrap { margin-bottom: 22px; }
-  .chime-toggle { display: inline-flex; align-items: center; gap: 16px; cursor: pointer; -webkit-user-select: none; user-select: none; }
-  /* the real checkbox stays focusable but invisible; the plate below is its face */
-  .chime-toggle input { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  /* Cockpit toggle: riveted brass plate, engraved ON / OFF, lever swings up (ON) or down (OFF). */
-  .toggle-plate { position: relative; flex: none; width: 58px; height: 96px; border-radius: 3px;
-    background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo));
-    border: 2px solid #2a1408;
-    box-shadow: inset 0 1px 0 rgba(255,240,180,0.7), inset 0 -2px 4px rgba(0,0,0,0.4), 0 3px 8px rgba(0,0,0,0.5);
-    display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 6px 0; }
-  .toggle-plate::before, .toggle-plate::after { content: ""; position: absolute; left: 50%; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fff2b8, #8b6914); box-shadow: 0 1px 0 rgba(0,0,0,0.4), inset 0 0 0 1px rgba(42,20,8,0.5); }
-  .toggle-plate::before { top: -3px; } .toggle-plate::after { bottom: -3px; }
-  .tp-label { font-family: "Courier New", monospace; font-size: 10px; font-weight: bold; letter-spacing: 0.18em; color: rgba(42,20,8,0.7);
-    text-shadow: 0 1px 0 rgba(255,240,180,0.5); transition: color var(--dur-base) var(--ease-out); }
-  .tp-well { position: relative; width: 22px; flex: 1; margin: 4px 0; border-radius: 11px;
-    background: linear-gradient(90deg, #0f0703, #2a1408 50%, #0f0703); border: 1px solid var(--ink); box-shadow: inset 0 2px 5px rgba(0,0,0,0.8); }
-  .tp-lever { position: absolute; left: 50%; top: 50%; width: 8px; height: 22px; margin-left: -4px; transform-origin: 50% 0; transform: rotate(0deg);
-    transition: transform var(--dur-base) var(--ease-out); }
-  .tp-lever::before { content: ""; position: absolute; inset: 0 0 6px 0; border-radius: 4px;
-    background: linear-gradient(90deg, #8b6914, var(--brass-hi) 45%, #8b6914); box-shadow: 0 2px 3px rgba(0,0,0,0.6); }
-  .tp-lever::after { content: ""; position: absolute; left: -2px; bottom: 0; width: 12px; height: 12px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fff2b8, #c39a3a 55%, #6b4a08); border: 1px solid var(--ink); box-shadow: 0 2px 4px rgba(0,0,0,0.6); }
-  .chime-toggle input:checked + .toggle-plate .tp-lever { transform: rotate(180deg); }
-  .chime-toggle input:checked + .toggle-plate .tp-label.on { color: #1a0d05; }
-  .chime-toggle input:not(:checked) + .toggle-plate .tp-label.off { color: #1a0d05; }
+  .chime-toggle { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  /* Vintage radio pushbuttons: two ivory keys on a recessed plate; the chosen key stays pressed in. */
+  .radio-keys { display: inline-flex; gap: 6px; padding: 7px; border: 0; margin: 0;
+    background: linear-gradient(180deg, #1b0e06, #2d1809); border-radius: 4px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 0 2px #b8892f, 0 0 0 3px var(--ink), 0 2px 6px rgba(0,0,0,0.5); }
+  .rkey { position: relative; cursor: pointer; -webkit-user-select: none; user-select: none; }
+  .rkey input { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .rkey span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px;
+    width: 64px; height: 50px; padding-bottom: 7px; border-radius: 2px;
+    font-family: "Courier New", monospace; font-size: 12px; font-weight: bold; letter-spacing: 0.2em; color: #3a2411;
+    background: linear-gradient(180deg, #f4ead0, #d9c89c 70%, #bfa974);
+    border: 1px solid #3a1e08;
+    box-shadow: inset 0 1px 0 #fffbe9, 0 4px 0 #6b4a20, 0 5px 6px rgba(0,0,0,0.6);
+    transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out), background var(--dur-press) var(--ease-out); }
+  .rkey span::before { content: ""; width: 22px; height: 4px; border-radius: 2px; background: #5a4630; box-shadow: inset 0 1px 1px rgba(0,0,0,0.6); }
+  .rkey input:checked + span { transform: translateY(4px); color: #1a0d05;
+    background: linear-gradient(180deg, #cdbb8c, #b8a272);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.45), 0 0 0 rgba(0,0,0,0), 0 1px 2px rgba(0,0,0,0.5); }
+  .rkey input:checked + span::before { background: var(--led-amber); box-shadow: 0 0 8px 1px rgba(255,184,74,0.8); }
+  .rkey input:focus-visible + span { outline: 2px solid var(--brass-hi); outline-offset: 3px; }
   .chime-label { font-size: 13px; color: var(--cream); }
   .vol-head { display: flex; justify-content: flex-end; align-items: baseline; margin-bottom: 8px; }
   .vol-head .val { font-size: 22px; color: var(--brass-hi); font-weight: bold; }
@@ -914,8 +913,6 @@
     outline: 2px solid var(--brass-hi);
     outline-offset: 3px;
   }
-  .chime-toggle input:focus-visible + .toggle-plate { outline: 2px solid var(--brass-hi); outline-offset: 4px; }
-
   /* --- Tab view enter --- */
   @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
   .view.entering { animation: view-in var(--dur-fast) var(--ease-out); }
@@ -938,7 +935,7 @@
     .rec-btn.recording::before, .rec-btn.sending .rec-ring,
     .call-light.on, .ind.green.pulse .bulb, .view.entering { animation: none !important; }
     .rec-btn.recording::before { display: none; }
-    .progress-fill, .toast, .tp-lever, .tp-label { transition-duration: 1ms; }
+    .progress-fill, .toast, .rkey span { transition-duration: 1ms; }
   }
 </style>
 </head>
@@ -1002,15 +999,13 @@
               <div class="hint" style="margin-top:8px;">Set before recording — it broadcasts to all speakers the moment you stop.</div>
             </div>
             <div class="chime-wrap">
-              <label class="chime-toggle">
-                <input type="checkbox" id="att-chime" role="switch" />
-                <span class="toggle-plate" aria-hidden="true">
-                  <span class="tp-label on">ON</span>
-                  <span class="tp-well"><span class="tp-lever"></span></span>
-                  <span class="tp-label off">OFF</span>
-                </span>
+              <div class="chime-toggle">
+                <fieldset class="radio-keys" aria-label="Airplane chime at start and end">
+                  <label class="rkey"><input type="radio" name="att-chime" id="att-chime-on" value="1" /><span>ON</span></label>
+                  <label class="rkey"><input type="radio" name="att-chime" id="att-chime-off" value="0" /><span>OFF</span></label>
+                </fieldset>
                 <span class="chime-label">Airplane chime at start &amp; end</span>
-              </label>
+              </div>
               <div class="hint" style="margin-top:6px;">Sounds the seatbelt “bong” before and after your announcement.</div>
             </div>
           </div>
@@ -1397,8 +1392,8 @@
             <div class="lamp green ${playingNow ? 'on' : ''}" role="img" aria-label="${playingNow ? 'Playing' : 'Not playing'}" title="${playingNow ? 'Playing' : 'Not playing'}">
               <span class="lens"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg></span>Play
             </div>
-            <div class="lamp red ${muted ? 'on' : ''}" role="img" aria-label="${muted ? 'Muted' : 'Not muted'}" title="${muted ? 'Muted' : 'Not muted'}">
-              <span class="lens"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 4.2h2.3L6.5 1.5v9L3.3 7.8H1z" fill="currentColor"/><path d="M8 4l3 4M11 4L8 8" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg></span>Mute
+            <div class="mute-sign ${muted ? 'on' : ''}" role="img" aria-label="${muted ? 'Muted' : 'Not muted'}" title="${muted ? 'Muted' : 'Not muted'}">
+              <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M4 12h5.5L17 5.5v21L9.5 20H4z" fill="currentColor"/><path d="M21.5 11.5l8 9M29.5 11.5l-8 9" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/></svg>Mute
             </div>
           </div>
           ${plate}
@@ -1792,9 +1787,10 @@
     volSlider.addEventListener('input', () => volVal.textContent = volSlider.value);
 
     // Airplane chime toggle (persisted; default ON)
-    const chimeEl = $('att-chime');
-    chimeEl.checked = (localStorage.getItem('att_play_chime') || '1') === '1';
-    chimeEl.addEventListener('change', () => localStorage.setItem('att_play_chime', chimeEl.checked ? '1' : '0'));
+    const chimeOn = $('att-chime-on'), chimeOff = $('att-chime-off');
+    const chimeEl = { get checked() { return chimeOn.checked; } };
+    (localStorage.getItem('att_play_chime') || '1') === '1' ? (chimeOn.checked = true) : (chimeOff.checked = true);
+    [chimeOn, chimeOff].forEach(r => r.addEventListener('change', () => localStorage.setItem('att_play_chime', chimeOn.checked ? '1' : '0')));
 
     // Chime is baked into the front of the recording (decoded at the recorder's
     // sample rate) so one clip guarantees chime → voice ordering on the speakers.
