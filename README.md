@@ -4,7 +4,7 @@
 
 **Version 1.0** · Last updated: 17 October 2026
 
-Created by **Reza K** ([@rkgits](https://github.com/rkgits)) · [GitHub profile](https://github.com/rkgits) · [Project board](https://github.com/users/rkgits/projects/2)
+Created by **Reza K** ([@rkgits](https://github.com/rkgits)) · [GitHub profile](https://github.com/rkgits) · [Project board](https://github.com/users/rkgits/projects/2) · [MIT License](LICENSE)
 
 > Captain Speaking is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Sonos, Inc. "Sonos" is a trademark of Sonos, Inc.
 
@@ -42,6 +42,7 @@ Record a message in your browser, optionally wrapped in an airplane chime, and i
 - [Tests](#tests)
 - [Project layout](#project-layout)
 - [Security note](#security-note)
+- [License](#license)
 - [Roadmap and credits](#roadmap-and-credits)
 
 ---
@@ -340,8 +341,16 @@ The app has **no login**. Anyone who can reach its port can control your speaker
 
 ---
 
+## License
+
+Released under the [MIT License](LICENSE). Copyright (c) 2026 Reza K.
+
+You are free to use, copy, modify and share this software, including commercially. The one condition is that the copyright notice and license text, which name the original author, stay in every copy or substantial portion of it.
+
+---
+
 ## Roadmap and credits
 
 Planned work is tracked on the [project board](https://github.com/users/rkgits/projects/2), with the issues in this repository's Issues tab. The next big item is support for several playback sessions at once, with a session switcher.
 
-Created by **Reza K** · GitHub: [@rkgits](https://github.com/rkgits) · <https://github.com/rkgits>
+Created by **Reza K** · GitHub: [@rkgits](https://github.com/rkgits) · <https://github.com/rkgits> · Licensed under the [MIT License](LICENSE)
