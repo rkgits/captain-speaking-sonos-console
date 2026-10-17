@@ -189,7 +189,6 @@ These are used by `scripts/deploy.sh` and are all part of macOS unless noted:
 | `curl` | Health check after a deploy |
 | `sha256sum` | Detects changes in `requirements.txt` |
 | `python3` + the packages above | Builds the deploy `.venv` |
-| **A GitHub Actions self-hosted runner** (not included in macOS) | Runs the deploy workflows |
 | **Two launchd plist files** you create yourself | Not in this repo. See [Deploying as a service](#deploying-as-a-service). |
 
 ---
@@ -278,12 +277,12 @@ Open `https://<computer-ip>:8443` on the phone and accept the self-signed certif
 
 ## Deploying as a service
 
-`scripts/deploy.sh` installs the app as a launchd service on a Mac, using a self-hosted GitHub Actions runner. Install the [prerequisites above](#to-deploy-as-a-background-service-optional) first.
+**Most people don't need this section.** For a normal home setup, use [`start.command`](#quick-start) and the [start at login](#keep-it-running-start-at-login) script. `scripts/deploy.sh` is an advanced option that keeps separate staging and production copies on one Mac and snapshots production before each deploy. Install the [prerequisites above](#to-deploy-as-a-background-service-optional) first, then run it yourself from a clone of this repository, for example `bash scripts/deploy.sh production`.
 
-| Environment | Trigger | Directory | HTTP | HTTPS |
+| Environment | Command | Directory | HTTP | HTTPS |
 |---|---|---|---|---|
-| staging | push to `develop` | `~/sonos/staging` | 8788 | 8444 |
-| production | manual run of the **Deploy to Production** workflow | `~/sonos/production` | 8787 | 8443 |
+| staging | `bash scripts/deploy.sh staging` | `~/sonos/staging` | 8788 | 8444 |
+| production | `bash scripts/deploy.sh production` | `~/sonos/production` | 8787 | 8443 |
 
 On each deploy the script:
 
@@ -294,7 +293,7 @@ On each deploy the script:
 5. Rebuilds the `.venv` when `requirements.txt` changes, restarts the launchd agent and waits for `/state`.
 6. On staging, runs the test suite.
 
-**One-time setup:** register a self-hosted runner on the Mac, and create launchd agents `com.sonos-app` (production) and `com.sonos-app-staging` (staging). Each should run that environment's `run_server.sh` with `KeepAlive` enabled. The plist files aren't part of this repo.
+**One-time setup:** create launchd agents `com.sonos-app` (production) and `com.sonos-app-staging` (staging). Each should run that environment's `run_server.sh` with `KeepAlive` enabled. The plist files aren't part of this repo.
 
 ### Rollback
 
