@@ -1,17 +1,23 @@
-# Sonos Console 🎛️📣
+# Captain Speaking 🎛️📣
 
-*Last updated: 16 October 2026*
+*A vintage-style web console for your Sonos speakers, with whole-home voice announcements.*
+
+**Version 1.0** · Last updated: 17 October 2026
+
+Created by **Reza K** ([@rkgits](https://github.com/rkgits)) · [GitHub profile](https://github.com/rkgits) · [Project board](https://github.com/users/rkgits/projects/2)
+
+> Captain Speaking is an independent, unofficial project. It is not affiliated with, endorsed by or sponsored by Sonos, Inc. "Sonos" is a trademark of Sonos, Inc.
 
 **Sonos makes great speakers with a so-so control experience.**
 
 When music is playing, you can't tell who started it or what's on. To turn the volume up or down you have to track down whoever is controlling it, and half the time they tap the wrong thing and the music stops. If you've ever lost a party playlist that way, this app is for you.
 
-**Sonos Console** is a small web app that runs on your own computer. Nothing to install on your phone, no account, no cloud. Open it in any browser on your home network and you get:
+**Captain Speaking** is a small web app that runs on your own computer. Nothing to install on your phone, no account, no cloud. Open it in any browser on your home network and you get:
 
 - 🔊 **Volume for every speaker**, one slider each, plus a group volume.
 - 🔇 **Mute and unmute** any speaker.
 - 🔗 **Add or remove speakers** from whatever is playing, so a room can join or leave the music in one tap.
-- ▶️ **See what's playing** on each group (AirPlay, Spotify and more), with play, pause, next and previous.
+- ▶️ **See what's playing** on each group (AirPlay, Spotify and more), with album artwork, a vintage level-meter visualizer, and play, pause, next and previous.
 - 📣 **Voice announcements on all your speakers at once.** The fun part.
 
 ### The announcement feature (Attention / Flight Attendant tab)
@@ -36,6 +42,7 @@ Record a message in your browser, optionally wrapped in an airplane chime, and i
 - [Tests](#tests)
 - [Project layout](#project-layout)
 - [Security note](#security-note)
+- [Roadmap and credits](#roadmap-and-credits)
 
 ---
 
@@ -96,8 +103,8 @@ Sonos can change its firmware at any time, so this list reflects the date at the
 ## Quick start
 
 ```bash
-git clone https://github.com/rkgits/sonos-app.git
-cd sonos-app
+git clone https://github.com/rkgits/captain-speaking-sonos-console.git
+cd captain-speaking-sonos-console
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app:app --host 0.0.0.0 --port 8787
@@ -292,3 +299,11 @@ certs/               Self-signed TLS cert (created by deploy, git-ignored)
 ## Security note
 
 The app has **no login**. Anyone who can reach its port can control your speakers and broadcast audio through them. Run it only on a trusted home network, and never expose it to the internet.
+
+---
+
+## Roadmap and credits
+
+Planned work is tracked on the [project board](https://github.com/users/rkgits/projects/2), with the issues in this repository's Issues tab. The next big item is support for several playback sessions at once, with a session switcher.
+
+Created by **Reza K** · GitHub: [@rkgits](https://github.com/rkgits) · <https://github.com/rkgits>

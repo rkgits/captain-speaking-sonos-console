@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Sonos Console</title>
+<title>Captain Speaking</title>
 <style>
   :root {
     --wood-dark:  #2b1608;
@@ -18,6 +18,8 @@
     --led-green:  #45e07a;
     --led-red:    #ff4a3d;
     --led-amber:  #ffb84a;
+    /* readable face for names and titles (Courier stays for engraved labels) */
+    --font-read:  "Gill Sans", "Gill Sans MT", "Trebuchet MS", "Helvetica Neue", Arial, sans-serif;
     /* motion tokens (Emil Kowalski curves) */
     --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
     --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -132,9 +134,9 @@
     border-radius: 10px;
     padding: 22px 26px;
     display: grid;
-    grid-template-columns: 1fr 240px;
-    gap: 24px;
-    align-items: center;
+    grid-template-columns: 210px 1fr;
+    gap: 28px;
+    align-items: start;
     box-shadow:
       inset 0 1px 0 rgba(255,200,140,0.15),
       inset 0 -3px 6px rgba(0,0,0,0.35),
@@ -155,19 +157,22 @@
     text-shadow: 0 0 8px rgba(246,220,131,0.5);
   }
   .now .title {
-    font-size: 24px;
+    font-family: var(--font-read);
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
     color: var(--cream);
-    font-style: italic;
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
-    line-height: 1.2;
+    line-height: 1.25;
   }
   .now .artist {
+    font-family: var(--font-read);
     color: var(--parchment);
     font-size: 16px;
     margin-bottom: 12px;
-    font-style: italic;
   }
   .now .album {
+    font-family: var(--font-read);
     color: var(--parchment);
     font-size: 13px;
     opacity: 0.75;
@@ -203,96 +208,123 @@
     margin-bottom: 14px;
   }
 
-  .badges {
-    display: flex; flex-wrap: wrap; gap: 8px;
-    margin-top: 8px;
+  /* --- Album artwork: a brass-framed picture on the console --- */
+  .art-frame {
+    width: 210px; height: 210px;
+    padding: 8px;
+    background: linear-gradient(180deg, var(--brass-hi), var(--brass-mid) 55%, var(--brass-lo));
+    border: 2px solid #2a1408;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 0 rgba(255,240,180,0.7), inset 0 -2px 4px rgba(0,0,0,0.4), 0 6px 14px rgba(0,0,0,0.55);
   }
-  .badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 12px;
-    border-radius: 14px;
-    font-family: "Courier New", monospace;
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
+  .art-inner {
+    position: relative; width: 100%; height: 100%;
+    background: radial-gradient(circle at 50% 40%, #2a1408, #0d0603);
     border: 1px solid var(--ink);
-    background: rgba(0,0,0,0.3);
-    color: var(--parchment);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.7);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
   }
-  .badge.state.playing {
-    background: linear-gradient(180deg, rgba(69,224,122,0.35), rgba(20,85,32,0.4));
-    color: #d0ffd8;
-    border-color: #2c6b30;
+  .art-inner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .record {
+    width: 76%; aspect-ratio: 1; border-radius: 50%;
+    background:
+      radial-gradient(circle, transparent 0 22%, #c39a3a 22% 34%, #1a0d05 34% 36%, transparent 36%),
+      repeating-radial-gradient(circle, #1b1109 0 2px, #0f0803 2px 4px);
+    box-shadow: 0 0 0 2px #000, 0 4px 12px rgba(0,0,0,0.7);
   }
-  .badge.state.paused {
-    background: linear-gradient(180deg, rgba(255,184,74,0.3), rgba(90,55,15,0.4));
-    color: #ffe0a8;
-    border-color: #8b6914;
-  }
-  .badge.state.stopped {
-    background: rgba(0,0,0,0.4);
-    color: #a89478;
-  }
-  .badge.source {
-    background: linear-gradient(180deg, var(--brass-hi), var(--brass-lo));
-    color: var(--ink);
-    border-color: #2a1408;
-    font-weight: bold;
-    text-shadow: 0 1px 0 rgba(255,255,255,0.3);
-  }
-  .badge.device {
-    background: linear-gradient(180deg, var(--parchment), #a67a3a);
-    color: var(--ink);
-    border-color: #3a1e08;
-  }
-  .badge .dot {
-    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-    background: currentColor;
-  }
-  .badge.state.playing .dot {
-    background: var(--led-green);
-    box-shadow: 0 0 6px var(--led-green);
-    animation: pulse 1.6s infinite;
-  }
-  .badge.state.paused .dot {
-    background: var(--led-amber);
-    box-shadow: 0 0 6px var(--led-amber);
-  }
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
-  }
-  .session-line {
-    font-family: "Courier New", monospace;
-    font-size: 10px;
-    color: rgba(217,183,129,0.85);
-    letter-spacing: 0.1em;
-    margin-top: 12px;
-  }
+  .record.spin { animation: spin 5s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* --- Group control panel (replaces VU) --- */
-  .group-panel {
-    width: 240px;
-    justify-self: end;
-    display: flex; flex-direction: column; gap: 12px;
-    padding: 14px 12px;
-    background: linear-gradient(180deg, #4a2810, #2b1608);
-    border: 2px solid var(--ink);
-    border-radius: 8px;
-    box-shadow:
-      inset 0 1px 0 rgba(255,220,170,0.20),
-      inset 0 -2px 4px rgba(0,0,0,0.4),
-      0 4px 12px rgba(0,0,0,0.5);
+  .now-main { min-width: 0; }
+
+  /* --- Visualizer: a bank of glass-tube level bars --- */
+  .viz-wrap {
+    margin: 10px 0 12px;
+    padding: 8px;
+    background: linear-gradient(180deg, #0f0703, #2a1408);
+    border: 1px solid var(--ink);
+    border-radius: 4px;
+    box-shadow: var(--bevel-inset), 0 0 0 3px rgba(195,154,58,0.55);
   }
-  .group-panel .label {
+  .viz { display: block; width: 100%; height: 84px; }
+
+  /* --- Transport + volume deck --- */
+  .deck {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 14px 28px;
+    margin: 4px 0 16px;
+  }
+  .deck .vol { flex: 1; min-width: 220px; }
+  .deck .label {
     font-family: "Courier New", monospace;
     font-size: 9px;
     letter-spacing: 0.35em;
     text-transform: uppercase;
     color: var(--parchment);
-    text-align: center;
     opacity: 0.8;
+    margin-bottom: 2px;
   }
+
+  /* --- Indicator lamps: status shown as panel lights, not buttons --- */
+  .lamps {
+    display: flex; flex-wrap: wrap; gap: 10px 26px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(0,0,0,0.5);
+    box-shadow: inset 0 1px 0 rgba(255,200,140,0.10);
+  }
+  .ind {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 9px;
+    font-family: "Courier New", monospace;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--parchment);
+    cursor: default;
+    user-select: none;
+  }
+  .bulb {
+    width: 14px; height: 14px; border-radius: 50%; flex: none;
+    background: radial-gradient(circle at 35% 28%, #5a463a, #1a0d05 72%);
+    box-shadow: 0 0 0 2px #b8892f, 0 0 0 3px var(--ink), inset 0 2px 3px rgba(0,0,0,0.8);
+  }
+  .ind.green .bulb {
+    background: radial-gradient(circle at 35% 28%, #d8ffe3, var(--led-green) 50%, #0f5a22);
+    box-shadow: 0 0 0 2px #b8892f, 0 0 0 3px var(--ink), 0 0 12px 2px rgba(69,224,122,0.65);
+  }
+  .ind.amber .bulb {
+    background: radial-gradient(circle at 35% 28%, #fff0c8, var(--led-amber) 50%, #7a4a08);
+    box-shadow: 0 0 0 2px #b8892f, 0 0 0 3px var(--ink), 0 0 12px 2px rgba(255,184,74,0.6);
+  }
+  .ind.green.pulse .bulb { animation: pulse 1.8s infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+  .ind.count { cursor: help; }
+  .ind.count:focus-visible { outline: 2px solid var(--brass-hi); outline-offset: 6px; border-radius: 3px; }
+  .ind .tip {
+    position: absolute; left: 0; bottom: calc(100% + 12px); z-index: 5;
+    min-width: 140px; max-width: 260px;
+    padding: 9px 13px;
+    background: #100804;
+    border: 1px solid var(--brass-mid);
+    border-radius: 3px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+    font-family: var(--font-read);
+    font-size: 13px; letter-spacing: 0.02em; text-transform: none;
+    color: var(--cream);
+    opacity: 0; visibility: hidden; transform: translateY(4px);
+    transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast);
+  }
+  .ind .tip ul { list-style: none; }
+  .ind .tip li { padding: 2px 0; }
+  .ind.count:focus .tip, .ind.count.open .tip { opacity: 1; visibility: visible; transform: none; }
+  @media (hover: hover) and (pointer: fine) {
+    .ind.count:hover .tip { opacity: 1; visibility: visible; transform: none; }
+  }
+
   .transport-row {
     display: flex; justify-content: center; align-items: center;
     gap: 10px;
@@ -463,51 +495,75 @@
     white-space: nowrap;
   }
 
+  /* Engraved plaque: flat, square, riveted, default cursor. Buttons are round-cornered
+     brass with a raised bevel; this must never be mistaken for one. */
   .card .nameplate {
-    background: linear-gradient(180deg, var(--parchment), #b8945a);
-    color: var(--ink);
+    position: relative;
+    width: 17ch; max-width: calc(100% - 16px);
+    margin: 0 auto 8px;
+    padding: 7px 16px;
+    background: #e8d3a6;
+    color: #2a1608;
     border: 1px solid #3a1e08;
-    border-radius: 4px;
-    padding: 4px 10px;
-    font-family: "Courier New", monospace;
-    font-size: 12px;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    display: inline-block;
-    margin-bottom: 8px;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
-    max-width: 90%;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    border-radius: 2px;
+    box-shadow: inset 0 0 0 3px #e8d3a6, inset 0 0 0 4px rgba(58,30,8,0.55), inset 0 2px 5px rgba(0,0,0,0.25);
+    font-family: var(--font-read);
+    font-weight: 600; font-size: 14px; letter-spacing: 0.03em; line-height: 1.25;
+    text-align: center;
     white-space: nowrap;
+    cursor: default; user-select: none;
   }
-  .card .subline {
-    font-family: "Courier New", monospace;
-    font-size: 9px;
-    color: var(--parchment);
-    letter-spacing: 0.2em;
-    
-    margin-bottom: 8px;
+  .card .nameplate::before, .card .nameplate::after {
+    content: ""; position: absolute; top: 50%; width: 4px; height: 4px; margin-top: -2px;
+    border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff2b8, #8b6914);
+    box-shadow: 0 1px 0 rgba(0,0,0,0.4);
   }
-
-  .leds {
-    display: flex; justify-content: center; gap: 10px;
-    margin-bottom: 8px; height: 12px;
+  .card .nameplate::before { left: 6px; }
+  .card .nameplate::after { right: 6px; }
+  .np-win { overflow: hidden; }
+  .np-track { display: inline-flex; }
+  .np-track > span { padding-right: 2.5em; }
+  .nameplate.scroll .np-track { animation: np-scroll var(--dur, 8s) linear infinite; }
+  @keyframes np-scroll { to { transform: translateX(-50%); } }
+  @media (hover: hover) and (pointer: fine) {
+    .nameplate.scroll:hover .np-track { animation-play-state: paused; }
   }
-  .led {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: #2a1408;
-    border: 1px solid var(--ink);
-    box-shadow: inset 0 1px 1px rgba(0,0,0,0.6);
+  @media (prefers-reduced-motion: reduce) {
+    .nameplate.scroll .np-track { animation: none; display: block; }
+    .nameplate.scroll .np-track > span:first-child { display: block; overflow: hidden; text-overflow: ellipsis; padding-right: 0; }
+    .nameplate.scroll .np-track > span:last-child { display: none; }
+    .record.spin { animation: none; }
   }
-  .led.on.playing {
-    background: radial-gradient(circle at 35% 30%, #b5ffcc, var(--led-green) 60%, #145520);
-    box-shadow: 0 0 6px var(--led-green), inset 0 1px 1px rgba(255,255,255,0.4);
+  .lamps-sp { display: flex; justify-content: center; gap: 20px; margin-bottom: 12px; }
+  .lamp {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    font-family: "Courier New", monospace; font-size: 8px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--parchment);
+    cursor: default; user-select: none;
   }
-  .led.on.muted {
-    background: radial-gradient(circle at 35% 30%, #ffc8bd, var(--led-red) 60%, #6b1b12);
-    box-shadow: 0 0 6px var(--led-red), inset 0 1px 1px rgba(255,255,255,0.4);
+  .lamp .lens {
+    width: 26px; height: 26px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.16);
+    background: radial-gradient(circle at 35% 28%, #5a463a, #1a0d05 72%);
+    box-shadow: 0 0 0 3px #b8892f, 0 0 0 4px var(--ink), inset 0 2px 4px rgba(0,0,0,0.8);
+    transition: box-shadow var(--dur-base) var(--ease-out), background var(--dur-base) var(--ease-out);
   }
+  .lamp .lens svg { width: 13px; height: 13px; }
+  .lamp.green.on .lens {
+    color: rgba(0,50,12,0.8);
+    background: radial-gradient(circle at 35% 28%, #d8ffe3, var(--led-green) 50%, #0f5a22);
+    box-shadow: 0 0 0 3px #b8892f, 0 0 0 4px var(--ink), 0 0 14px 2px rgba(69,224,122,0.7), inset 0 -2px 4px rgba(0,0,0,0.35);
+  }
+  .mute-sign {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    font-family: "Courier New", monospace; font-size: 8px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: rgba(244,224,184,0.45); cursor: default; user-select: none;
+    transition: color var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out);
+  }
+  .mute-sign svg { width: 28px; height: 28px; color: rgba(255,255,255,0.18); transition: color var(--dur-base) var(--ease-out), filter var(--dur-base) var(--ease-out); }
+  .mute-sign.on { color: var(--led-red); }
+  .mute-sign.on svg { color: var(--led-red); filter: drop-shadow(0 0 5px rgba(255,74,61,0.8)); }
 
   /* --- Fader --- */
   .fader-wrap {
@@ -703,12 +759,16 @@
     body { padding: 14px 12px 40px; }
     .now {
       grid-template-columns: 1fr;
+      gap: 0;
     }
-    .group-panel {
-      width: 100%;
-      justify-self: stretch;
+    .art-frame {
+      position: absolute; top: 16px; right: 16px;
+      width: 84px; height: 84px; padding: 4px;
     }
-    .now .title { font-size: 18px; }
+    .now-title { padding-right: 98px; min-height: 84px; }
+    .now .title { font-size: 20px; }
+    .deck .vol { min-width: 0; flex-basis: 100%; }
+    .ind .tip { max-width: 220px; }
   }
 
   /* ===== Attention tab ===== */
@@ -763,14 +823,15 @@
     color: var(--brass-hi); text-shadow: 0 2px 0 rgba(0,0,0,0.6), 0 0 18px rgba(246,220,131,0.55); }
   .hero .placard .tag { display: block; margin-top: 6px; font-family: "Courier New", monospace;
     font-size: 10px; letter-spacing: 0.34em; color: var(--cream); opacity: 0.85; text-transform: uppercase; }
-  .fasten { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 2;
-    display: inline-flex; align-items: center; gap: 8px; padding: 5px 14px; border-radius: 4px;
-    background: linear-gradient(180deg, #7a1f14, #4a0f09); border: 1px solid #2a0805;
-    color: #ffd9b0; font-family: "Courier New", monospace; font-size: 10px; letter-spacing: 0.3em;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
-  .fasten .led { width: 8px; height: 8px; border-radius: 50%; background: var(--led-red);
-    box-shadow: 0 0 8px var(--led-red); animation: att-blink 1.1s steps(1) infinite; }
-  @keyframes att-blink { 50% { opacity: 0.25; } }
+  /* Flight-attendant call light: dark glass until an announcement is in progress, then it blinks */
+  .call-light { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 2;
+    width: 54px; height: 54px; border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 50% 35%, #3a2a1a, #140a04 75%); color: rgba(255,184,74,0.22);
+    border: 2px solid #b8892f; box-shadow: 0 0 0 2px var(--ink), 0 3px 10px rgba(0,0,0,0.6), inset 0 2px 5px rgba(0,0,0,0.8); }
+  .call-light svg { width: 34px; height: 34px; }
+  .call-light.on { color: var(--led-amber); box-shadow: 0 0 0 2px var(--ink), 0 0 18px 3px rgba(255,184,74,0.55), inset 0 2px 5px rgba(0,0,0,0.8);
+    animation: att-blink 1.1s steps(1) infinite; }
+  @keyframes att-blink { 50% { opacity: 0.3; } }
 
   .att-body { padding: 24px 30px 0; }
   .att-row { display: flex; gap: 26px; flex-wrap: wrap; align-items: flex-start; }
@@ -783,16 +844,28 @@
     font-size: 11px; text-decoration: underline; font-family: inherit; }
   .vol-wrap { margin-bottom: 22px; }
   .chime-wrap { margin-bottom: 22px; }
-  .chime-toggle { display: inline-flex; align-items: center; gap: 12px; cursor: pointer; -webkit-user-select: none; user-select: none; }
-  .chime-toggle input { display: none; }
-  .chime-toggle .switch { width: 46px; height: 26px; border-radius: 13px; flex: none; position: relative;
-    background: rgba(0,0,0,0.45); border: 1px solid var(--ink); box-shadow: inset 0 1px 3px rgba(0,0,0,0.6); transition: background 0.2s; }
-  .chime-toggle .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%;
-    background: radial-gradient(circle at 35% 30%, #fff2b8, #c39a3a 60%, #6b4a08); box-shadow: 0 1px 3px rgba(0,0,0,0.6); transition: transform 0.2s; }
-  .chime-toggle input:checked + .switch { background: linear-gradient(90deg, var(--brass-mid), var(--brass-hi)); }
-  .chime-toggle input:checked + .switch::after { transform: translateX(20px); }
+  .chime-toggle { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  /* Vintage radio pushbuttons: two ivory keys on a recessed plate; the chosen key stays pressed in. */
+  .radio-keys { display: inline-flex; gap: 6px; padding: 7px; border: 0; margin: 0;
+    background: linear-gradient(180deg, #1b0e06, #2d1809); border-radius: 4px;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.8), 0 0 0 2px #b8892f, 0 0 0 3px var(--ink), 0 2px 6px rgba(0,0,0,0.5); }
+  .rkey { position: relative; cursor: pointer; -webkit-user-select: none; user-select: none; }
+  .rkey input { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .rkey span { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px;
+    width: 64px; height: 50px; padding-bottom: 7px; border-radius: 2px;
+    font-family: "Courier New", monospace; font-size: 12px; font-weight: bold; letter-spacing: 0.2em; color: #3a2411;
+    background: linear-gradient(180deg, #f4ead0, #d9c89c 70%, #bfa974);
+    border: 1px solid #3a1e08;
+    box-shadow: inset 0 1px 0 #fffbe9, 0 4px 0 #6b4a20, 0 5px 6px rgba(0,0,0,0.6);
+    transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-press) var(--ease-out), background var(--dur-press) var(--ease-out); }
+  .rkey span::before { content: ""; width: 22px; height: 4px; border-radius: 2px; background: #5a4630; box-shadow: inset 0 1px 1px rgba(0,0,0,0.6); }
+  .rkey input:checked + span { transform: translateY(4px); color: #1a0d05;
+    background: linear-gradient(180deg, #cdbb8c, #b8a272);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.45), 0 0 0 rgba(0,0,0,0), 0 1px 2px rgba(0,0,0,0.5); }
+  .rkey input:checked + span::before { background: var(--led-amber); box-shadow: 0 0 8px 1px rgba(255,184,74,0.8); }
+  .rkey input:focus-visible + span { outline: 2px solid var(--brass-hi); outline-offset: 3px; }
   .chime-label { font-size: 13px; color: var(--cream); }
-  .vol-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .vol-head { display: flex; justify-content: flex-end; align-items: baseline; margin-bottom: 8px; }
   .vol-head .val { font-size: 22px; color: var(--brass-hi); font-weight: bold; }
   .att input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 8px; border-radius: 4px;
     background: linear-gradient(90deg, var(--brass-mid), var(--brass-hi)); outline: none; border: 1px solid var(--ink);
@@ -806,7 +879,8 @@
     color: #fff; display: inline-flex; align-items: center; justify-content: center; transition: transform var(--dur-press) var(--ease-out); }
   .rec-btn:active { transform: scale(0.97); }
   .rec-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .rec-btn .mic { font-size: 46px; line-height: 1; }
+  .rec-btn .mic { display: inline-flex; line-height: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.45)); }
+  .rec-btn .mic svg { width: 58px; height: 58px; }
   .rec-btn.recording { background: radial-gradient(circle at 38% 32%, #555, #2a2a2a 60%, #111); }
   .rec-btn.recording::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; pointer-events: none;
     border: 2px solid rgba(255,74,61,0.55); animation: att-pulse 1.4s var(--ease-out) infinite; }
@@ -839,8 +913,6 @@
     outline: 2px solid var(--brass-hi);
     outline-offset: 3px;
   }
-  .chime-toggle input:focus-visible + .switch { outline: 2px solid var(--brass-hi); outline-offset: 3px; }
-
   /* --- Tab view enter --- */
   @keyframes view-in { from { opacity: 0; transform: translateY(4px); } }
   .view.entering { animation: view-in var(--dur-fast) var(--ease-out); }
@@ -860,11 +932,10 @@
 
   /* --- Reduced motion: gentler, not zero --- */
   @media (prefers-reduced-motion: reduce) {
-    .badge.state.playing .dot, .fasten .led,
     .rec-btn.recording::before, .rec-btn.sending .rec-ring,
-    .view.entering { animation: none !important; }
+    .call-light.on, .ind.green.pulse .bulb, .view.entering { animation: none !important; }
     .rec-btn.recording::before { display: none; }
-    .progress-fill, .toast { transition-duration: 1ms; }
+    .progress-fill, .toast, .rkey span { transition-duration: 1ms; }
   }
 </style>
 </head>
@@ -876,8 +947,8 @@
     <div class="screw bl"></div>
     <div class="screw br"></div>
     <a class="dash-link" href="/dashboard">⬡ Dashboard</a>
-    <h1>SONOS CONSOLE</h1>
-    <div class="sub">Vintage Series · Model MMXXVI</div>
+    <h1>CAPTAIN SPEAKING</h1>
+    <div class="sub">Vintage Series · Model MMXXVI · <span id="app-version">v1.0</span></div>
   </div>
 
   <div class="tabs">
@@ -898,7 +969,9 @@
       <div class="screw bl"></div><div class="screw br"></div>
 
       <div class="hero">
-        <div class="fasten"><span class="led"></span> FASTEN SEATBELTS</div>
+        <div class="call-light" id="att-call" role="img" aria-label="Flight attendant call light: off">
+          <svg viewBox="0 0 48 48" aria-hidden="true" focusable="false"><circle cx="24" cy="14" r="7" fill="currentColor"/><path d="M9 41c0-9 6-15 15-15s15 6 15 15z" fill="currentColor"/><path d="M33 5l3-3M38 10l3-1M35 15l4 2" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+        </div>
         <img id="att-hero" alt="" />
         <div class="placeholder" id="att-hero-ph" hidden>✈︎ add static/attention.jpg for the hero image</div>
         <div class="placard">
@@ -920,18 +993,19 @@
             <div class="vol-wrap">
               <span class="field-label">Announcement volume</span>
               <div class="vol-head">
-                <span style="font-size:12px;color:var(--parchment);">soft&nbsp;·&nbsp;loud</span>
                 <span class="val" id="att-vol-val">45</span>
               </div>
               <input type="range" id="att-vol" min="0" max="100" value="45" />
               <div class="hint" style="margin-top:8px;">Set before recording — it broadcasts to all speakers the moment you stop.</div>
             </div>
             <div class="chime-wrap">
-              <label class="chime-toggle">
-                <input type="checkbox" id="att-chime" />
-                <span class="switch"></span>
-                <span class="chime-label">✈ Airplane chime at start &amp; end</span>
-              </label>
+              <div class="chime-toggle">
+                <fieldset class="radio-keys" aria-label="Airplane chime at start and end">
+                  <label class="rkey"><input type="radio" name="att-chime" id="att-chime-on" value="1" /><span>ON</span></label>
+                  <label class="rkey"><input type="radio" name="att-chime" id="att-chime-off" value="0" /><span>OFF</span></label>
+                </fieldset>
+                <span class="chime-label">Airplane chime at start &amp; end</span>
+              </div>
               <div class="hint" style="margin-top:6px;">Sounds the seatbelt “bong” before and after your announcement.</div>
             </div>
           </div>
@@ -939,7 +1013,7 @@
             <div class="recorder">
               <button class="rec-btn" id="att-rec">
                 <span class="rec-ring" id="att-ring"></span>
-                <span class="mic" id="att-icon">🎙️</span>
+                <span class="mic" id="att-icon" aria-hidden="true"></span>
               </button>
               <div class="countdown"><span id="att-cd">60</span><span class="max">&nbsp;/ 60s</span></div>
               <div class="hint" id="att-hint">Tap to record — max 60 seconds</div>
@@ -989,6 +1063,7 @@
   let activeDrag = 0;
   // progress ticker reference (set by renderNow)
   let progressRef = null;
+  let lastGridHtml = '';
   // master group volume: local override during drag
   let masterLocal = { until: 0, value: null };
   // true while a transport command is in flight OR settling — blocks all transport buttons
@@ -1163,11 +1238,6 @@
     const pct = durationS > 0 ? Math.min(100, (elapsedS / durationS) * 100) : 0;
     const showProgress = durationS > 0 && durationS < 24 * 3600;
 
-    const memberChips = g.member_uuids.map(uuid => {
-      const d = latest.devices[uuid];
-      return d ? escapeHTML(d.name) : '';
-    }).filter(Boolean).join(' · ');
-
     // Remember reference for smooth ticker
     progressRef = {
       coord: g.coordinator_uuid,
@@ -1182,16 +1252,32 @@
     const playPauseIcon = (state === 'PLAYING') ? '❚❚' : '▶';
     const playPauseAction = (state === 'PLAYING') ? 'pause' : 'play';
 
+    const artSrc = t.art
+      ? `${API_BASE}/art/${encodeURIComponent(g.coordinator_uuid)}?v=${encodeURIComponent((t.title || '') + '|' + (t.artist || ''))}`
+      : '';
+    const stateLamp = state === 'PLAYING' ? 'green pulse' : (state === 'PAUSED_PLAYBACK' || state === 'TRANSITIONING') ? 'amber' : '';
+    const sourceLamp = (t.source && t.source !== 'Idle') ? 'amber' : '';
+    const names = g.member_uuids.map(u => latest.devices[u]?.name).filter(Boolean);
+
     nowWrap.innerHTML = `
       <div class="now">
         ${screws()}
-        <div>
-          <div class="title-row">
-            <span class="icon">♪</span>
-            <div class="title">${escapeHTML(title)}</div>
+        <div class="art-frame">
+          <div class="art-inner">
+            <div class="record ${state === 'PLAYING' ? 'spin' : ''}"></div>
+            ${artSrc ? `<img src="${artSrc}" alt="Album artwork" onerror="this.remove()">` : ''}
           </div>
-          ${t.artist ? `<div class="artist">${escapeHTML(t.artist)}</div>` : ''}
-          ${t.album ? `<div class="album">${escapeHTML(t.album)}</div>` : ''}
+        </div>
+        <div class="now-main">
+          <div class="now-title">
+            <div class="title-row">
+              <span class="icon">♪</span>
+              <div class="title">${escapeHTML(title)}</div>
+            </div>
+            ${t.artist ? `<div class="artist">${escapeHTML(t.artist)}</div>` : ''}
+            ${t.album ? `<div class="album">${escapeHTML(t.album)}</div>` : ''}
+          </div>
+          <div class="viz-wrap"><canvas class="viz" id="viz" aria-hidden="true"></canvas></div>
           ${showProgress ? `
             <div class="progress-track"><div class="progress-fill" id="progress-fill" style="transform:scaleX(${Math.max(0, Math.min(1, pct / 100))})"></div></div>
             <div class="progress-times">
@@ -1199,33 +1285,37 @@
               <span>${fmtTime(durationS)}</span>
             </div>
           ` : ''}
-          <div class="badges">
-            <span class="badge state ${stateCls}"><span class="dot"></span>${escapeHTML(stateLabel)}</span>
-            <span class="badge source">${escapeHTML(source)}</span>
-            <span class="badge">${memberCount} speaker${memberCount === 1 ? '' : 's'}</span>
-          </div>
-          ${memberCount > 1 ? `<div class="session-line">Group · ${escapeHTML(memberChips)}</div>` : ''}
-          ${t.session ? `<div class="session-line">Session · ${escapeHTML(t.session.slice(0, 16))}${t.session.length > 16 ? '…' : ''}</div>` : ''}
-        </div>
-        <div class="group-panel" data-coord="${g.coordinator_uuid}">
-          <div class="label">Transport</div>
-          <div class="transport-row">
-            <button class="t-btn" data-t-action="prev" title="Previous">⏮</button>
-            <button class="t-btn big" data-t-action="${playPauseAction}" title="${playPauseAction}">${playPauseIcon}</button>
-            <button class="t-btn" data-t-action="next" title="Next">⏭</button>
-          </div>
-          <div class="label">Master Volume</div>
-          <div class="master-row">
-            <div class="h-fader" id="master-fader" data-value="${gv ?? 0}">
-              <div class="h-fader-slot"></div>
-              <div class="h-fader-fill" style="width: calc(${gv ?? 0}% - 12px)"></div>
-              <div class="h-fader-handle" style="left: calc(${gv ?? 0}% + 3px)"></div>
+          <div class="deck" data-coord="${g.coordinator_uuid}">
+            <div class="transport-row">
+              <button class="t-btn" data-t-action="prev" title="Previous">⏮</button>
+              <button class="t-btn big" data-t-action="${playPauseAction}" title="${playPauseAction}">${playPauseIcon}</button>
+              <button class="t-btn" data-t-action="next" title="Next">⏭</button>
             </div>
-            <div class="master-readout" id="master-readout">${gv ?? '—'}</div>
+            <div class="vol">
+              <div class="label">Master Volume</div>
+              <div class="master-row">
+                <div class="h-fader" id="master-fader" data-value="${gv ?? 0}">
+                  <div class="h-fader-slot"></div>
+                  <div class="h-fader-fill" style="width: calc(${gv ?? 0}% - 12px)"></div>
+                  <div class="h-fader-handle" style="left: calc(${gv ?? 0}% + 3px)"></div>
+                </div>
+                <div class="master-readout" id="master-readout">${gv ?? '—'}</div>
+              </div>
+            </div>
+          </div>
+          <div class="lamps">
+            <span class="ind ${stateLamp}"><span class="bulb"></span>${escapeHTML(stateLabel)}</span>
+            <span class="ind ${sourceLamp}"><span class="bulb"></span>${escapeHTML(source)}</span>
+            <span class="ind count amber" tabindex="0" aria-describedby="spk-tip"><span class="bulb"></span>${memberCount} speaker${memberCount === 1 ? '' : 's'}
+              <span class="tip" id="spk-tip" role="tooltip"><ul>${names.map(n => `<li>${escapeHTML(n)}</li>`).join('')}</ul></span>
+            </span>
           </div>
         </div>
       </div>
     `;
+    const countLamp = nowWrap.querySelector('.ind.count');
+    if (countLamp) countLamp.addEventListener('click', (e) => { e.stopPropagation(); countLamp.classList.toggle('open'); });
+    startViz();
     attachTransport(g.coordinator_uuid);
     attachMaster(g.coordinator_uuid);
   }
@@ -1240,12 +1330,15 @@
   }
 
   function render() {
+    const ver = $('app-version');
+    if (ver && latest.version) ver.textContent = 'v' + latest.version.split('.').slice(0, 2).join('.');
     renderNow();
     const groups = latest.groups || [];
     const devices = latest.devices || {};
     const playing = playingGroup();
     const playingCoord = playing?.coordinator_uuid;
     const playingMembers = new Set(playing?.member_uuids || []);
+    const playingState = (latest.transport[playingCoord] || {}).state;
 
     // Order: coordinator first, then other playing members, then others alphabetical
     const uuids = Object.keys(devices);
@@ -1270,8 +1363,6 @@
       const muted = vol.muted === true;
       const inPlaying = playingMembers.has(uuid);
       const isCoord = uuid === playingCoord;
-      const groupOf = groups.find(g => (g.member_uuids || []).includes(uuid));
-      const isCoordAny = groupOf?.coordinator_uuid === uuid;
 
       let actionBtn = '';
       if (playing && !inPlaying) {
@@ -1288,17 +1379,26 @@
       ].filter(Boolean).join(' ');
 
       const handleTopPct = 100 - displayVol;
+      const playingNow = inPlaying && playingState === 'PLAYING';
+      const nm = d.name || '';
+      const nmLen = [...nm].length;
+      const plate = nmLen > 15
+        ? `<div class="nameplate scroll" title="${escapeHTML(nm)}"><div class="np-win"><span class="np-track" style="--dur:${Math.max(6, nmLen * 0.4).toFixed(1)}s"><span>${escapeHTML(nm)}</span><span aria-hidden="true">${escapeHTML(nm)}</span></span></div></div>`
+        : `<div class="nameplate" title="${escapeHTML(nm)}"><div class="np-win"><span>${escapeHTML(nm)}</span></div></div>`;
 
       return `
         <div class="${cls}" data-uuid="${uuid}">
           ${isCoord ? '<div class="coord-plate">◆ Coordinator ◆</div>' : ''}
           ${screws()}
-          <div class="leds">
-            <div class="led ${inPlaying ? 'on playing' : ''}" title="In playing group"></div>
-            <div class="led ${muted ? 'on muted' : ''}" title="Muted"></div>
+          <div class="lamps-sp">
+            <div class="lamp green ${playingNow ? 'on' : ''}" role="img" aria-label="${playingNow ? 'Playing' : 'Not playing'}" title="${playingNow ? 'Playing' : 'Not playing'}">
+              <span class="lens"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.5v9l7.5-4.5z" fill="currentColor"/></svg></span>Play
+            </div>
+            <div class="mute-sign ${muted ? 'on' : ''}" role="img" aria-label="${muted ? 'Muted' : 'Not muted'}" title="${muted ? 'Muted' : 'Not muted'}">
+              <svg viewBox="0 0 32 32" aria-hidden="true" focusable="false"><path d="M4 12h5.5L17 5.5v21L9.5 20H4z" fill="currentColor"/><path d="M21.5 11.5l8 9M29.5 11.5l-8 9" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/></svg>Mute
+            </div>
           </div>
-          <div class="nameplate">${escapeHTML(d.name)}</div>
-          <div class="subline">${isCoordAny && !isCoord ? 'COORD (other group)' : (inPlaying && !isCoord ? 'MEMBER' : (isCoord ? 'PLAYING NOW' : 'STANDBY'))}</div>
+          ${plate}
           <div class="fader-wrap">
             <div class="fader" data-uuid="${uuid}" data-value="${displayVol}">
               <div class="fader-slot"></div>
@@ -1316,6 +1416,8 @@
       `;
     }).join('');
 
+    if (html === lastGridHtml && grid.childElementCount) return;
+    lastGridHtml = html;
     grid.innerHTML = html;
     attachFaders();
     attachButtons();
@@ -1527,6 +1629,84 @@
     }
   }
 
+  document.addEventListener('click', () => {
+    const c = nowWrap.querySelector('.ind.count.open');
+    if (c) c.classList.remove('open');
+  });
+
+  // ---- Vintage visualizer ----
+  // The speakers play the audio, so the app never receives it. This is an animation driven
+  // by playback state (running while PLAYING, decaying to rest otherwise), not an analysis.
+  const VIZ_BARS = 28, VIZ_SEGS = 14;
+  const viz = { level: new Array(VIZ_BARS).fill(0), peak: new Array(VIZ_BARS).fill(0), raf: 0, last: 0 };
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+  function drawViz(cv) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
+    if (!w || !h) return;
+    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, w, h);
+    const gap = 3 * dpr, bw = (w - gap * (VIZ_BARS - 1)) / VIZ_BARS;
+    const sg = 2 * dpr, sh = (h - sg * (VIZ_SEGS - 1)) / VIZ_SEGS;
+    for (let i = 0; i < VIZ_BARS; i++) {
+      const x = i * (bw + gap);
+      const lit = Math.round(viz.level[i] * VIZ_SEGS);
+      const peakSeg = Math.min(VIZ_SEGS - 1, Math.round(viz.peak[i] * VIZ_SEGS));
+      for (let sIdx = 0; sIdx < VIZ_SEGS; sIdx++) {
+        const y = h - (sIdx + 1) * sh - sIdx * sg;
+        const frac = sIdx / (VIZ_SEGS - 1);
+        const color = frac > 0.82 ? '#ff4a3d' : frac > 0.58 ? '#ffb84a' : '#45e07a';
+        const on = sIdx < lit || (sIdx === peakSeg && viz.peak[i] > 0.05);
+        ctx.fillStyle = on ? color : 'rgba(255,200,140,0.07)';
+        ctx.fillRect(x, y, bw, sh);
+      }
+    }
+  }
+
+  function vizFrame(ts) {
+    viz.raf = 0;
+    const cv = document.getElementById('viz');
+    if (!cv) return;
+    const playing = progressRef && progressRef.state === 'PLAYING' && !document.hidden;
+    if (ts - viz.last >= 33) {
+      viz.last = ts;
+      const t = ts / 1000;
+      const beat = Math.pow(Math.max(0, Math.sin(t * Math.PI * 4)), 3);   // ~120 bpm pulse
+      let active = false;
+      for (let i = 0; i < VIZ_BARS; i++) {
+        let target = 0;
+        if (playing) {
+          const n1 = Math.sin(t * (1.7 + i * 0.37) + i * 1.3) * 0.5 + 0.5;
+          const n2 = Math.sin(t * (0.9 + i * 0.21) + i * 2.1) * 0.5 + 0.5;
+          const tilt = 1 - (i / VIZ_BARS) * 0.35;
+          target = Math.min(1, (0.15 + 0.6 * n1 * n2 + 0.25 * n1) * (0.65 + 0.45 * beat) * tilt);
+        }
+        const up = target > viz.level[i];
+        viz.level[i] += (target - viz.level[i]) * (up ? 0.5 : 0.12);
+        viz.peak[i] = Math.max(viz.level[i], viz.peak[i] - 0.015);
+        if (viz.level[i] > 0.01 || viz.peak[i] > 0.01) active = true;
+      }
+      drawViz(cv);
+      if (!active) return;   // fully at rest: stop the loop until playback resumes
+    }
+    viz.raf = requestAnimationFrame(vizFrame);
+  }
+
+  function startViz() {
+    const cv = document.getElementById('viz');
+    if (!cv) return;
+    if (reduceMotion.matches) {
+      // static, calm display: no animation loop
+      for (let i = 0; i < VIZ_BARS; i++) { viz.level[i] = progressRef && progressRef.state === 'PLAYING' ? 0.25 + 0.2 * Math.sin(i * 0.5) ** 2 : 0; viz.peak[i] = viz.level[i]; }
+      drawViz(cv);
+      return;
+    }
+    if (!viz.raf) viz.raf = requestAnimationFrame(vizFrame);
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) startViz(); });
+
   // ---- Smooth elapsed ticker ----
   function tickProgress() {
     if (!progressRef) return;
@@ -1609,9 +1789,10 @@
     volSlider.addEventListener('input', () => volVal.textContent = volSlider.value);
 
     // Airplane chime toggle (persisted; default ON)
-    const chimeEl = $('att-chime');
-    chimeEl.checked = (localStorage.getItem('att_play_chime') || '1') === '1';
-    chimeEl.addEventListener('change', () => localStorage.setItem('att_play_chime', chimeEl.checked ? '1' : '0'));
+    const chimeOn = $('att-chime-on'), chimeOff = $('att-chime-off');
+    const chimeEl = { get checked() { return chimeOn.checked; } };
+    (localStorage.getItem('att_play_chime') || '1') === '1' ? (chimeOn.checked = true) : (chimeOff.checked = true);
+    [chimeOn, chimeOff].forEach(r => r.addEventListener('change', () => localStorage.setItem('att_play_chime', chimeOn.checked ? '1' : '0')));
 
     // Chime is baked into the front of the recording (decoded at the recorder's
     // sample rate) so one clip guarantees chime → voice ordering on the speakers.
@@ -1629,6 +1810,17 @@
     for (let i = 0; i < BARS; i++) { const b = document.createElement('div'); b.className = 'bar'; meter.appendChild(b); bars.push(b); }
 
     const recBtn = $('att-rec'), recIcon = $('att-icon'), recRing = $('att-ring');
+    // Flat 2D vintage broadcast microphone (idle) and a brass stop block (recording)
+    const MIC_SVG = '<svg viewBox="0 0 64 64" focusable="false"><path d="M13 29a19 19 0 0 0 38 0" fill="none" stroke="#2a1408" stroke-width="3.5" stroke-linecap="round"/><path d="M32 48v9M21 58h22" stroke="#2a1408" stroke-width="3.5" stroke-linecap="round"/><rect x="19" y="5" width="26" height="38" rx="13" fill="#f4e0b8" stroke="#2a1408" stroke-width="3"/><g stroke="#2a1408" stroke-width="1.6" opacity="0.55" stroke-linecap="round"><path d="M22 17h20M21 24h22M21 31h22M23 38h18"/><path d="M32 6v36M26 7v35M38 7v35"/></g><path d="M23 12c0-3 2-5 5-6" stroke="#fff" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/></svg>';
+    const STOP_SVG = '<svg viewBox="0 0 64 64" focusable="false"><rect x="14" y="14" width="36" height="36" rx="5" fill="#f4e0b8" stroke="#2a1408" stroke-width="3"/><rect x="21" y="21" width="22" height="22" rx="2" fill="none" stroke="#2a1408" stroke-width="1.6" opacity="0.5"/></svg>';
+    recIcon.innerHTML = MIC_SVG;
+    recBtn.setAttribute('aria-label', 'Record announcement');
+    // Flight-attendant call light: blinks from the moment recording starts until the broadcast is done
+    const callLight = $('att-call');
+    function setCall(on) {
+      callLight.classList.toggle('on', on);
+      callLight.setAttribute('aria-label', 'Flight attendant call light: ' + (on ? 'on, announcement in progress' : 'off'));
+    }
     const cdEl = $('att-cd'), statusEl = $('att-status'), hintEl = $('att-hint');
     function status(msg, color) { statusEl.textContent = msg; statusEl.style.color = color || AMBER; }
 
@@ -1662,7 +1854,7 @@
         return;
       }
       recording = true; chunks = []; startTs = Date.now();
-      recBtn.classList.add('recording'); recIcon.textContent = '⏹';
+      recBtn.classList.add('recording'); recIcon.innerHTML = STOP_SVG; recBtn.setAttribute('aria-label', 'Stop recording'); setCall(true);
       hintEl.textContent = 'Recording… tap to stop';
       status('● REC', RED);
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1685,7 +1877,7 @@
       if (!recording) return;
       recording = false;
       clearInterval(tickId); tickId = null;
-      recBtn.classList.remove('recording'); recIcon.textContent = '🎙️';
+      recBtn.classList.remove('recording'); recIcon.innerHTML = MIC_SVG; recBtn.setAttribute('aria-label', 'Record announcement');
       hintEl.textContent = 'Tap to record — max 60 seconds';
       recRing.style.setProperty('--pct', '0%');
       resetMeter();
@@ -1693,7 +1885,7 @@
       if (stream) stream.getTracks().forEach(t => t.stop());
       analyser = null; cdEl.textContent = '60';
       const total = chunks.reduce((n, c) => n + c.length, 0);
-      if (total < sampleRate * 0.3) { if (audioCtx) audioCtx.close(); status('✗ too short — hold to record', RED); return; }
+      if (total < sampleRate * 0.3) { if (audioCtx) audioCtx.close(); status('✗ too short — hold to record', RED); setCall(false); return; }
       const voice = new Float32Array(total);
       let off = 0; for (const c of chunks) { voice.set(c, off); off += c.length; }
       let out = voice;
@@ -1741,10 +1933,10 @@
         status(failN ? `✓ played on ${d.played}, ${failN} failed — stream resumed` : `✓ played on all ${d.played} speakers — stream resumed`, GREEN);
         toast(failN ? `✓ Played on ${d.played} · ${failN} failed` : `✓ Broadcast to all ${d.played} speakers`, failN ? 'info' : 'ok');
       } catch (e) { const m = '✗ ' + (e.message || 'upload failed'); status(m, RED); toast(m, 'err'); }
-      finally { recBtn.classList.remove('sending'); }
+      finally { recBtn.classList.remove('sending'); setCall(false); }
     }
 
-    recBtn.addEventListener('click', () => recording ? stopRec() : startRec());
+    recBtn.addEventListener('click', () => Promise.resolve(recording ? stopRec() : startRec()).catch(e => { console.error(e); setCall(false); }));
 
     // Secure-context guard: recording needs HTTPS (or localhost)
     if (!window.isSecureContext) {
