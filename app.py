@@ -588,6 +588,8 @@ async def api_leave(req: LeaveReq) -> dict:
 
 
 def _transport_error(action: str, e: Exception) -> HTTPException:
+    if isinstance(e, HTTPException):
+        return e  # e.g. 404 unknown device — don't mask as a 503 transport failure
     msg = str(e)
     # Extract Sonos UPnP error description if present
     m = re.search(r"<errorDescription>([^<]+)</errorDescription>", msg)
