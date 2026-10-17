@@ -1,5 +1,5 @@
 """
-API contract tests for the Sonos app.
+API contract tests for Captain Speaking.
 These run against a live server (staging or production) and do NOT require
 Sonos hardware to be reachable — they test the HTTP API contract only.
 
@@ -106,4 +106,10 @@ class TestUnknownDevice:
 
     def test_mute_unknown_uuid_returns_404(self, client):
         r = client.post("/mute", json={"uuid": "nonexistent-uuid", "muted": True})
+        assert r.status_code == 404
+
+
+class TestAlbumArt:
+    def test_art_unknown_uuid_returns_404(self, client):
+        r = client.get("/art/nonexistent-uuid")
         assert r.status_code == 404

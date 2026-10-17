@@ -1,6 +1,6 @@
 """
-Sonos wooden-panel console — local web app.
-Run: uvicorn app:app --host 127.0.0.1 --port 8787
+Captain Speaking — a vintage-style local web console for Sonos speakers.
+Run: uvicorn app:app --host 0.0.0.0 --port 8787
 """
 from __future__ import annotations
 
@@ -24,6 +24,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+
+VERSION = "1.0.0"
 
 SOAP_TIMEOUT = 4.0
 REFRESH_INTERVAL = 2.0
@@ -71,14 +73,14 @@ class _RingHandler(logging.Handler):
             "msg": self.format(record),
         })
 
-_log = logging.getLogger("sonos")
+_log = logging.getLogger("captain-speaking")
 _log.setLevel(logging.DEBUG)
 _rh = _RingHandler()
 _rh.setFormatter(logging.Formatter("%(message)s"))
 _log.addHandler(_rh)
 _log.propagate = False
 
-app = FastAPI(title="Sonos Wooden Console")
+app = FastAPI(title="Captain Speaking", version=VERSION)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -225,6 +227,14 @@ async def get_transport(client: httpx.AsyncClient, ip: str) -> dict[str, Any]:
     m = re.search(r"<upnp:album>([^<]*)</upnp:album>", raw_pi)
     if m:
         album = m.group(1)
+    art = None
+    m = re.search(r"<upnp:albumArtURI>([^<]*)</upnp:albumArtURI>", raw_pi)
+    if m:
+        art = html.unescape(m.group(1)).strip() or None
+        if art and art.startswith("/"):
+            art = f"http://{ip}:1400{art}"
+        elif art and not art.startswith(("http://", "https://")):
+            art = None
     duration = tag(pi, "TrackDuration")
     elapsed = tag(pi, "RelTime")
     # Extract AirPlay/Spotify session tag if present
@@ -239,6 +249,7 @@ async def get_transport(client: httpx.AsyncClient, ip: str) -> dict[str, Any]:
         "title": title,
         "artist": artist,
         "album": album,
+        "art": art,
         "duration": duration,
         "elapsed": elapsed,
         "session": session,
@@ -477,6 +488,7 @@ def _sse_snapshot() -> str:
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
         "https_port": HTTPS_PORT,
+        "version": VERSION,
     }
     return f"data: {json.dumps(payload)}\n\n"
 
@@ -554,6 +566,7 @@ async def api_state() -> dict:
         "group_volumes": STATE.group_volumes,
         "last_error": STATE.last_error,
         "https_port": HTTPS_PORT,
+        "version": VERSION,
     }
 
 
@@ -805,6 +818,27 @@ async def attention_delete(name: str) -> dict:
     return {"ok": True}
 
 
+@app.get("/art/{uuid}")
+async def album_art(uuid: str):
+    """Proxy the current album artwork for a coordinator, so HTTPS pages can show it
+    (speakers serve artwork over plain HTTP) and the browser never needs to reach them."""
+    from fastapi.responses import Response
+
+    url = (STATE.transport.get(uuid) or {}).get("art")
+    if not url:
+        raise HTTPException(404, "no artwork")
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            r = await c.get(url, timeout=5.0)
+        r.raise_for_status()
+    except Exception:
+        raise HTTPException(404, "artwork unavailable")
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(404, "artwork unavailable")
+    return Response(r.content, media_type=ctype, headers={"Cache-Control": "max-age=3600"})
+
+
 @app.get("/")
 async def root():
     return FileResponse(os.path.join(BASE, "static", "index.html"))
@@ -975,7 +1009,7 @@ async def dashboard():
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Sonos Dashboard</title>
+<title>Captain Speaking · Dashboard</title>
 <style>
   :root {{
     --wood-dark:#2b1608; --wood-mid:#4a2a14; --wood-lite:#6b3b1c;
@@ -1030,8 +1064,8 @@ async def dashboard():
 </head>
 <body>
 <a class="back" href="/">← Console</a>
-<h1>SONOS DASHBOARD</h1>
-<div class="sub">Monitoring · Flight Log</div>
+<h1>CAPTAIN SPEAKING</h1>
+<div class="sub">Dashboard · Monitoring · Flight Log</div>
 {error_html}
 <div class="dtabs">
   <button class="dtab" data-tab="monitoring" onclick="tab('monitoring')">Monitoring</button>
