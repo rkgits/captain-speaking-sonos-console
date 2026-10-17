@@ -3,10 +3,11 @@
 # Usage: bash scripts/rollback.sh
 set -e
 
-DEPLOY_DIR="$HOME/sonos-app"
-RELEASES_DIR="$HOME/sonos-releases/production"
+DEPLOY_DIR="$HOME/sonos/production"
+RELEASES_DIR="$HOME/sonos/releases/production"
 LAUNCHAGENT="com.sonos-app"
 PORT=8787
+HTTPS_PORT=8443
 
 # List available snapshots
 echo "==> Available snapshots:"
@@ -34,14 +35,27 @@ fi
 rsync -a --delete \
   --exclude='.venv/' \
   --exclude='*.log' \
+  --exclude='certs/' \
+  --exclude='recordings/' \
   "$LAST_RELEASE" "$DEPLOY_DIR/"
 
 # Recreate run_server.sh (env-specific)
 cat > "$DEPLOY_DIR/run_server.sh" << SCRIPT
 #!/bin/bash
 cd $DEPLOY_DIR
-echo "[\$(date)] Starting production server (rollback)..." >> $DEPLOY_DIR/server.log 2>&1
-exec /usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT
+echo "[\$(date)] Starting production server (rollback, HTTP $PORT + HTTPS $HTTPS_PORT)..." >> $DEPLOY_DIR/server.log 2>&1
+export PUBLIC_HTTP_PORT=$PORT
+export HTTPS_PORT=$HTTPS_PORT
+/usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $PORT >> $DEPLOY_DIR/server.log 2>&1 &
+HTTP_PID=\$!
+/usr/bin/caffeinate -s $DEPLOY_DIR/.venv/bin/uvicorn app:app --host 0.0.0.0 --port $HTTPS_PORT \\
+  --ssl-keyfile $DEPLOY_DIR/certs/key.pem --ssl-certfile $DEPLOY_DIR/certs/cert.pem >> $DEPLOY_DIR/server.log 2>&1 &
+HTTPS_PID=\$!
+while kill -0 \$HTTP_PID 2>/dev/null && kill -0 \$HTTPS_PID 2>/dev/null; do
+  sleep 5
+done
+kill \$HTTP_PID \$HTTPS_PID 2>/dev/null
+exit 1
 SCRIPT
 chmod +x "$DEPLOY_DIR/run_server.sh"
 
