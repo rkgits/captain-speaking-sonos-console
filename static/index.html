@@ -534,15 +534,6 @@
     .nameplate.scroll .np-track > span:last-child { display: none; }
     .record.spin { animation: none; }
   }
-  .card .subline {
-    font-family: "Courier New", monospace;
-    font-size: 9px;
-    color: var(--parchment);
-    letter-spacing: 0.2em;
-    
-    margin-bottom: 8px;
-  }
-
   .lamps-sp { display: flex; justify-content: center; gap: 20px; margin-bottom: 12px; }
   .lamp {
     display: flex; flex-direction: column; align-items: center; gap: 6px;
@@ -1352,8 +1343,6 @@
       const muted = vol.muted === true;
       const inPlaying = playingMembers.has(uuid);
       const isCoord = uuid === playingCoord;
-      const groupOf = groups.find(g => (g.member_uuids || []).includes(uuid));
-      const isCoordAny = groupOf?.coordinator_uuid === uuid;
 
       let actionBtn = '';
       if (playing && !inPlaying) {
@@ -1390,7 +1379,6 @@
             </div>
           </div>
           ${plate}
-          <div class="subline">${isCoordAny && !isCoord ? 'COORD (other group)' : (inPlaying && !isCoord ? 'MEMBER' : (isCoord ? 'PLAYING NOW' : 'STANDBY'))}</div>
           <div class="fader-wrap">
             <div class="fader" data-uuid="${uuid}" data-value="${displayVol}">
               <div class="fader-slot"></div>
