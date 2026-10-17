@@ -1,6 +1,6 @@
 #!/bin/bash
 # Usage: scripts/deploy.sh [staging|production]
-# Called by GitHub Actions self-hosted runner on this Mac.
+# Run by hand from a clone of the repository on the Mac that will serve the app.
 set -e
 
 ENV="${1:-staging}"
@@ -24,7 +24,7 @@ case "$ENV" in
     ;;
 esac
 
-RUNNER_WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
+SOURCE_DIR="$(pwd)"
 RELEASES_DIR="$HOME/sonos/releases/$ENV"
 
 echo "==> Deploying to $ENV ($DEPLOY_DIR, port $PORT)"
@@ -53,7 +53,7 @@ rsync -a --delete \
   --exclude='.pytest_cache/' \
   --exclude='certs/' \
   --exclude='recordings/' \
-  "$RUNNER_WORKSPACE/" "$DEPLOY_DIR/"
+  "$SOURCE_DIR/" "$DEPLOY_DIR/"
 
 # 2b. Ensure recordings dir (persists across deploys; excluded from rsync)
 mkdir -p "$DEPLOY_DIR/recordings"
