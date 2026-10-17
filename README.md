@@ -31,7 +31,7 @@ Record a message in your browser, optionally wrapped in an airplane chime, and i
 ## Contents
 
 - [Is my setup supported?](#is-my-setup-supported)
-- [Quick start](#quick-start)
+- [Quick start](#quick-start) (including start at login, stop and uninstall)
 - [Everything you need to install](#everything-you-need-to-install)
 - [Running on your local network](#running-on-your-local-network)
 - [How it works](#how-it-works)
@@ -105,16 +105,51 @@ Sonos can change its firmware at any time, so this list reflects the date at the
 ```bash
 git clone https://github.com/rkgits/captain-speaking-sonos-console.git
 cd captain-speaking-sonos-console
+./start.command
+```
+
+`start.command` sets everything up the first time (virtual environment and packages), then starts the server and prints the addresses to open. You can also **double-click it in Finder**.
+
+- On the computer: <http://localhost:8787>
+- On your phone or another computer on the network: `http://<computer-ip>:8787` (the script prints it for you)
+
+To use another port: `PORT=8788 ./start.command`.
+
+<details>
+<summary>Prefer to do it by hand?</summary>
+
+```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 .venv/bin/uvicorn app:app --host 0.0.0.0 --port 8787
 ```
 
-Open <http://localhost:8787>, or `http://<computer-ip>:8787` from your phone or another computer on the network. To find the computer's IP on macOS:
+To find the computer's IP on macOS: `ipconfig getifaddr en0` (Wi-Fi; try `en1` if it prints nothing).
+</details>
+
+### Keep it running: start at login
+
+Run this once, from a folder **outside** Documents, Desktop and Downloads (for example `~/captain-speaking`). macOS blocks background login items from reading those folders, and the script will tell you if you're in one.
 
 ```bash
-ipconfig getifaddr en0   # Wi-Fi; try en1 if this prints nothing
+scripts/install-launch-agent.sh
 ```
+
+Captain Speaking then starts whenever you log in and restarts itself if it stops. Its log is at `~/Library/Logs/captain-speaking.log`. The computer must stay awake to serve announcements, so turn off sleep in System Settings, Energy, if it's a dedicated machine.
+
+### Stop
+
+- **Started with `start.command`:** press **Ctrl-C** in its window, or close the window.
+- **Running at login:** `scripts/uninstall-launch-agent.sh` stops it and removes it from login items.
+- **Not sure what is running?** `lsof -nP -iTCP:8787 -sTCP:LISTEN` shows the process using the port. Stop it with `kill <PID>` using the number it shows.
+
+### Uninstall
+
+1. Stop it with the steps above. If you installed the login item, run `scripts/uninstall-launch-agent.sh`.
+2. Delete the project folder. This also deletes your saved announcements in `recordings/` and the HTTPS certificate in `certs/`. Move `recordings/` somewhere first if you want to keep them.
+3. Optional: delete `~/Library/Logs/captain-speaking.log`.
+
+Nothing else is installed on your computer. The app doesn't change your speakers or your Sonos account.
 
 ---
 
@@ -130,7 +165,7 @@ ipconfig getifaddr en0   # Wi-Fi; try en1 if this prints nothing
 | **`uvicorn` ≥ 0.29** | Web server | `pip`, via `requirements.txt` |
 | **`httpx` ≥ 0.27** | Talks to the speakers | `pip`, via `requirements.txt` |
 
-`ipconfig`, `arp` and `ping`, which the app calls for discovery, ship with macOS. Recording uses your browser's microphone, so there's nothing to install for it.
+`ipconfig`, `arp` and `ping`, which the app calls for discovery, and `lsof` and `shasum`, which `start.command` uses, all ship with macOS. Recording uses your browser's microphone, so there's nothing to install for it.
 
 The Python packages are pinned only as minimums in [requirements.txt](requirements.txt). The author's tested versions were `fastapi 0.128`, `uvicorn 0.39`, `httpx 0.28` and `pydantic 2.13` (installed automatically with FastAPI).
 
@@ -287,6 +322,9 @@ TEST_URL=http://localhost:8787 .venv/bin/pytest tests/ -v
 app.py               FastAPI app: Sonos control, discovery, announcements
 static/index.html    Single-page UI
 static/              Chime and hero image
+start.command        One-step start (sets up on first run)
+scripts/install-launch-agent.sh    Start at login, restart if it stops
+scripts/uninstall-launch-agent.sh  Stop and remove the login item
 scripts/deploy.sh    Deploy to staging or production
 scripts/rollback.sh  Restore the last production snapshot
 tests/               API tests
