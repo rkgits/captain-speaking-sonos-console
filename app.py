@@ -225,6 +225,14 @@ async def get_transport(client: httpx.AsyncClient, ip: str) -> dict[str, Any]:
     m = re.search(r"<upnp:album>([^<]*)</upnp:album>", raw_pi)
     if m:
         album = m.group(1)
+    art = None
+    m = re.search(r"<upnp:albumArtURI>([^<]*)</upnp:albumArtURI>", raw_pi)
+    if m:
+        art = html.unescape(m.group(1)).strip() or None
+        if art and art.startswith("/"):
+            art = f"http://{ip}:1400{art}"
+        elif art and not art.startswith(("http://", "https://")):
+            art = None
     duration = tag(pi, "TrackDuration")
     elapsed = tag(pi, "RelTime")
     # Extract AirPlay/Spotify session tag if present
@@ -239,6 +247,7 @@ async def get_transport(client: httpx.AsyncClient, ip: str) -> dict[str, Any]:
         "title": title,
         "artist": artist,
         "album": album,
+        "art": art,
         "duration": duration,
         "elapsed": elapsed,
         "session": session,
@@ -803,6 +812,27 @@ async def attention_delete(name: str) -> dict:
     os.remove(path)
     _log.info("Attention recording deleted: %s", fname)
     return {"ok": True}
+
+
+@app.get("/art/{uuid}")
+async def album_art(uuid: str):
+    """Proxy the current album artwork for a coordinator, so HTTPS pages can show it
+    (speakers serve artwork over plain HTTP) and the browser never needs to reach them."""
+    from fastapi.responses import Response
+
+    url = (STATE.transport.get(uuid) or {}).get("art")
+    if not url:
+        raise HTTPException(404, "no artwork")
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as c:
+            r = await c.get(url, timeout=5.0)
+        r.raise_for_status()
+    except Exception:
+        raise HTTPException(404, "artwork unavailable")
+    ctype = r.headers.get("content-type", "image/jpeg")
+    if not ctype.startswith("image/"):
+        raise HTTPException(404, "artwork unavailable")
+    return Response(r.content, media_type=ctype, headers={"Cache-Control": "max-age=3600"})
 
 
 @app.get("/")
