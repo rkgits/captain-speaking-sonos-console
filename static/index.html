@@ -1967,7 +1967,7 @@
       note.innerHTML = '🔒 Recording needs a secure connection. Loading the HTTPS address…';
       fetch(API_BASE + '/state').then(r => r.json()).then(s => {
         const port = s.https_port || 0;
-        if (port) note.innerHTML = `🔒 To record, open <a href="https://${location.hostname}:${port}/">https://${location.hostname}:${port}</a> (accept the one-time security warning).`;
+        if (port) note.innerHTML = `🔒 Recording needs a secure page. Open <a href="https://${location.hostname}:${port}/">https://${location.hostname}:${port}</a>.<br><small>Your browser will warn that the certificate isn't trusted. That's expected, because it's your own computer's certificate. On iPhone tap <b>Show Details</b>, then <b>visit this website</b>. On Android tap <b>Advanced</b>, then <b>Proceed</b>.</small>`;
         else note.innerHTML = '🔒 Recording needs HTTPS or localhost — open this app over its https:// address to enable the microphone.';
       }).catch(() => {});
     }
