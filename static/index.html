@@ -1060,7 +1060,21 @@
   // uuid -> ms timestamp until which server updates are ignored
   const localLock = new Map();
   // any active drag suppresses full re-render
-  let activeDrag = 0;
+  // A drag in progress pauses re-rendering so the control under the finger is not rebuilt.
+  // If a release is never seen (pointer let go outside the window, a lost event) the counter
+  // would stay above zero forever and freeze the whole UI, so it heals itself: any release
+  // anywhere clears it, and a drag that has not moved for DRAG_STALE_MS is treated as over.
+  const DRAG_STALE_MS = 8000;
+  const dragState = { n: 0, last: 0 };
+  function beginDrag() { dragState.n++; dragState.last = performance.now(); }
+  function touchDrag() { dragState.last = performance.now(); }
+  function endDrag() { dragState.n = Math.max(0, dragState.n - 1); }
+  function isDragging() {
+    if (dragState.n > 0 && performance.now() - dragState.last > DRAG_STALE_MS) dragState.n = 0;
+    return dragState.n > 0;
+  }
+  ['pointerup', 'pointercancel', 'mouseup', 'touchend', 'blur'].forEach(ev =>
+    window.addEventListener(ev, () => { dragState.n = 0; }, true));
   // progress ticker reference (set by renderNow)
   let progressRef = null;
   let lastGridHtml = '';
@@ -1165,8 +1179,9 @@
       latest = await r.json();
       errorBar.classList.toggle('show', !!latest.last_error);
       errorBar.textContent = latest.last_error || '';
-      if (!activeDrag) render();
+      if (!isDragging()) render();
     } catch (e) {
+      console.error('refresh failed', e);
       errorBar.classList.add('show');
       errorBar.textContent = 'Cannot reach backend at ' + API_BASE + ': ' + e;
     }
@@ -1252,8 +1267,9 @@
     const playPauseIcon = (state === 'PLAYING') ? '❚❚' : '▶';
     const playPauseAction = (state === 'PLAYING') ? 'pause' : 'play';
 
+    const artKey = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) | 0; return (h >>> 0).toString(36); };
     const artSrc = t.art
-      ? `${API_BASE}/art/${encodeURIComponent(g.coordinator_uuid)}?v=${encodeURIComponent((t.title || '') + '|' + (t.artist || ''))}`
+      ? `${API_BASE}/art/${encodeURIComponent(g.coordinator_uuid)}?v=${artKey(t.art + '|' + (t.title || '') + '|' + (t.artist || ''))}`
       : '';
     const stateLamp = state === 'PLAYING' ? 'green pulse' : (state === 'PAUSED_PLAYBACK' || state === 'TRANSITIONING') ? 'amber' : '';
     const sourceLamp = (t.source && t.source !== 'Idle') ? 'amber' : '';
@@ -1464,19 +1480,20 @@
       const onDown = (e) => {
         e.preventDefault();
         dragging = true;
-        activeDrag++;
+        beginDrag();
         fader.setPointerCapture(e.pointerId);
         lock(uuid, 5000);
         setFromY(e.clientY);
       };
       const onMove = (e) => {
         if (!dragging) return;
+        touchDrag();
         setFromY(e.clientY);
       };
       const onUp = (e) => {
         if (!dragging) return;
         dragging = false;
-        activeDrag = Math.max(0, activeDrag - 1);
+        endDrag();
         try { fader.releasePointerCapture(e.pointerId); } catch (_) {}
         scheduleSend(uuid, parseFloat(fader.dataset.value));
         lock(uuid, 1500);
@@ -1550,12 +1567,15 @@
         // Re-render immediately so the state badge updates (e.g. Playing → Paused).
         // Buttons remain disabled because _transportInFlight is still true —
         // attachTransport() applies btn.disabled = true to every new button it creates.
-        if (!activeDrag) render();
+        if (!isDragging()) render();
 
         // After the settle window, unlock and do a confirming refresh
         clearTimeout(_transportCooldownTimer);
         _transportCooldownTimer = setTimeout(() => {
           _transportInFlight = false;
+          // Unlock in place first: even if the follow-up render is skipped or fails, the
+          // buttons must never stay disabled.
+          for (const b of nowWrap.querySelectorAll('.t-btn')) b.disabled = false;
           refresh();  // fetches confirmed state and renders with fresh enabled buttons
         }, result?._error ? 300 : settleMs);
       });
@@ -1584,18 +1604,19 @@
     fader.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       dragging = true;
-      activeDrag++;
+      beginDrag();
       fader.setPointerCapture(e.pointerId);
       setFromX(e.clientX);
     });
     fader.addEventListener('pointermove', (e) => {
       if (!dragging) return;
+      touchDrag();
       setFromX(e.clientX);
     });
     const end = (e) => {
       if (!dragging) return;
       dragging = false;
-      activeDrag = Math.max(0, activeDrag - 1);
+      endDrag();
       try { fader.releasePointerCapture(e.pointerId); } catch (_) {}
       scheduleMasterSend(coord, parseFloat(fader.dataset.value));
       masterLocal = { until: performance.now() + 1500, value: parseFloat(fader.dataset.value) };
@@ -1737,8 +1758,8 @@
         latest = JSON.parse(e.data);
         errorBar.classList.toggle('show', !!latest.last_error);
         errorBar.textContent = latest.last_error || '';
-        if (!activeDrag) render();
-      } catch (_) {}
+        if (!isDragging()) render();
+      } catch (err) { console.error('live update failed', err); }
     };
     es.onerror = () => {
       es.close();
