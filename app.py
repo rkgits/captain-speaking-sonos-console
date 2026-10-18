@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 SOAP_TIMEOUT = 4.0
 REFRESH_INTERVAL = 2.0
