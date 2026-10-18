@@ -81,6 +81,12 @@ async def do_next(client, ip):
     state["next_at"] = time.time()
 
 
+async def attach_device_info(devices):
+    for u, n, ip, model, number in SPEAKERS:
+        devices[u].update({"model": model.replace("Sonos ", ""), "model_number": number,
+                           "software": "99.9-00000", "announcements": True})
+
+
 async def noop(*args, **kwargs):
     return None
 
@@ -100,6 +106,7 @@ if __name__ == "__main__":
     state["lag"] = args.lag
     for name, fn in dict(find_seed=find_seed, fetch_topology=fetch_topology, get_volume=get_volume,
                          get_mute=get_mute, get_group_volume=get_group_volume, get_transport=get_transport,
+                         attach_device_info=attach_device_info, prime_arp=lambda prefix: None,
                          do_next=do_next, do_play=noop, do_pause=noop, do_prev=noop, set_volume=noop,
                          set_mute=noop, set_group_volume=noop, join_group=noop, leave_group=noop).items():
         setattr(A, name, fn)

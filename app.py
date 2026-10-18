@@ -8,11 +8,13 @@ import asyncio
 import collections
 import datetime
 import html
+import ipaddress
 import json
 import logging
 import os
 import re
 import subprocess
+import time
 import wave
 from typing import Any
 
@@ -57,9 +59,13 @@ class State:
         self.group_volumes: dict[str, int] = {}
         self.ip_pool: set[str] = set()
         self.last_error: str | None = None
+        self.network_prefix: str | None = None   # e.g. "192.168.1."; changes when the computer joins another network
+        self.last_scan: float | None = None
 
 
 STATE = State()
+DEVICE_INFO: dict[str, dict] = {}   # uuid -> model details, read once per speaker
+_refresh_lock: asyncio.Lock | None = None
 _sse_clients: set[asyncio.Queue] = set()
 
 # ---------- In-memory log ring buffer ----------
@@ -306,46 +312,73 @@ async def do_prev(client: httpx.AsyncClient, ip: str) -> None:
 
 
 # ---------- Discovery ----------
-def get_local_prefix() -> str | None:
-    for iface in ("en0", "en1"):
-        try:
-            ip = subprocess.check_output(["ipconfig", "getifaddr", iface], stderr=subprocess.DEVNULL).decode().strip()
-            if ip:
-                return ".".join(ip.split(".")[:3]) + "."
-        except Exception:
-            continue
-    return None
+def _run(cmd: list[str]) -> str:
+    try:
+        return subprocess.check_output(cmd, stderr=subprocess.DEVNULL, timeout=3).decode(errors="replace").strip()
+    except Exception:
+        return ""
+
+
+def default_interface() -> str | None:
+    """The network interface the computer reaches the internet through (en0 for Wi-Fi on most Macs)."""
+    m = re.search(r"interface:\s*(\S+)", _run(["route", "-n", "get", "default"]))
+    return m.group(1) if m else None
+
+
+def _candidate_interfaces() -> list[str]:
+    first = default_interface()
+    return ([first] if first else []) + [i for i in ("en0", "en1") if i != first]
 
 
 def get_local_ip() -> str | None:
-    for iface in ("en0", "en1"):
-        try:
-            ip = subprocess.check_output(["ipconfig", "getifaddr", iface], stderr=subprocess.DEVNULL).decode().strip()
-            if ip:
-                return ip
-        except Exception:
-            continue
+    for iface in _candidate_interfaces():
+        ip = _run(["ipconfig", "getifaddr", iface])
+        if ip:
+            return ip
     return None
 
 
-async def play_audio_clip(
-    client: httpx.AsyncClient, ip: str, player_id: str, stream_url: str, volume: int | None = None
-) -> None:
-    """Play an announcement clip *over* whatever a player is doing (ducks, then restores).
+def get_local_prefix() -> str | None:
+    ip = get_local_ip()
+    return ".".join(ip.split(".")[:3]) + "." if ip else None
 
-    Uses the Sonos local audioClip API on port 1443 (self-signed cert → caller must use
-    an httpx client with verify=False). Does not disturb the underlying AirPlay/queue source.
-    """
-    body: dict[str, Any] = {"name": "Attention", "appId": "com.sonos.console", "streamUrl": stream_url}
-    if volume is not None:
-        body["volume"] = max(0, min(100, int(volume)))
-    r = await client.post(
-        f"https://{ip}:1443/api/v1/players/{player_id}/audioClip",
-        headers={"X-Sonos-Api-Key": SONOS_API_KEY, "Content-Type": "application/json"},
-        json=body,
-        timeout=6.0,
-    )
-    r.raise_for_status()
+
+def get_network_info() -> dict[str, Any]:
+    """Where this computer is on the network: Wi-Fi name (when macOS allows it), IP, subnet, router."""
+    iface = next((i for i in _candidate_interfaces() if _run(["ipconfig", "getifaddr", i])), None)
+    info: dict[str, Any] = {"interface": iface, "connection": None, "ssid": None, "ssid_hidden": False,
+                            "ip": None, "subnet": None, "gateway": None}
+    if not iface:
+        return info
+    info["ip"] = _run(["ipconfig", "getifaddr", iface]) or None
+    m = re.search(r"gateway:\s*(\S+)", _run(["route", "-n", "get", "default"]))
+    info["gateway"] = m.group(1) if m else None
+    m = re.search(r"netmask (0x[0-9a-fA-F]+)", _run(["ifconfig", iface]))
+    if info["ip"] and m:
+        try:
+            mask = str(ipaddress.IPv4Address(int(m.group(1), 16)))
+            info["subnet"] = str(ipaddress.ip_network(f"{info['ip']}/{mask}", strict=False))
+        except ValueError:
+            pass
+    ports = _run(["networksetup", "-listallhardwareports"])
+    port = re.search(r"Hardware Port:\s*(.+)\s*\nDevice:\s*" + re.escape(iface) + r"\b", ports)
+    kind = port.group(1).strip() if port else ""
+    info["connection"] = "wifi" if kind == "Wi-Fi" else ("ethernet" if "Ethernet" in kind or "LAN" in kind else "other")
+    if info["connection"] == "wifi":
+        out = _run(["networksetup", "-getairportnetwork", iface])
+        m = re.search(r"Current Wi-Fi Network:\s*(.+)", out)
+        if m:
+            info["ssid"] = m.group(1).strip()
+        else:
+            # Recent macOS hides the network name from apps without Location Services permission
+            summary = _run(["ipconfig", "getsummary", iface])
+            m = re.search(r"\bSSID\s*:\s*(.+)", summary)
+            name = m.group(1).strip() if m else ""
+            if name and "redacted" not in name.lower():
+                info["ssid"] = name
+            else:
+                info["ssid_hidden"] = True
+    return info
 
 
 def arp_ips() -> list[str]:
@@ -371,17 +404,94 @@ def prime_arp(prefix: str) -> None:
 
 
 async def find_seed(client: httpx.AsyncClient) -> str | None:
+    """Find any reachable speaker. Candidates are probed together, so a stale address left over
+    from another network does not hold things up."""
+    prefix = get_local_prefix()
     cands = list(STATE.ip_pool)
     for ip in arp_ips():
         if ip not in cands:
             cands.append(ip)
-    for ip in cands:
-        try:
-            await soap(client, ip, ZGT_PATH, ZGT_SVC, "GetZoneGroupState")
-            return ip
-        except Exception:
-            continue
-    return None
+    if prefix:
+        cands = [ip for ip in cands if ip.startswith(prefix)]   # drop addresses from a previous network
+
+    async def probe(ip: str) -> str:
+        await asyncio.wait_for(soap(client, ip, ZGT_PATH, ZGT_SVC, "GetZoneGroupState"), timeout=2.5)
+        return ip
+
+    tasks = [asyncio.ensure_future(probe(ip)) for ip in cands[:64]]
+    try:
+        for fut in asyncio.as_completed(tasks):
+            try:
+                return await fut
+            except Exception:
+                continue
+        return None
+    finally:
+        for t in tasks:
+            t.cancel()
+
+
+async def fetch_device_info(ip: str) -> dict[str, Any]:
+    """Model, firmware and announcement support, read from the speaker itself."""
+    info: dict[str, Any] = {"model": None, "model_number": None, "software": None, "announcements": None}
+    try:
+        async with httpx.AsyncClient() as c:
+            r = await c.get(f"http://{ip}:1400/xml/device_description.xml", timeout=3.0)
+        r.raise_for_status()
+        name = tag(r.text, "modelName") or tag(r.text, "displayName")
+        info["model"] = re.sub(r"^Sonos\s+", "", name) if name else None
+        info["model_number"] = tag(r.text, "modelNumber")
+        info["software"] = tag(r.text, "softwareVersion")
+    except Exception:
+        pass
+    try:
+        async with httpx.AsyncClient(verify=False) as c:
+            r = await c.get(f"https://{ip}:1443/api/v1/players/local/info",
+                            headers={"X-Sonos-Api-Key": SONOS_API_KEY}, timeout=3.0)
+        r.raise_for_status()
+        info["announcements"] = "AUDIO_CLIP" in (r.json().get("device", {}).get("capabilities") or [])
+    except Exception:
+        pass
+    return info
+
+
+async def attach_device_info(devices: dict[str, dict]) -> None:
+    """Add model details to each speaker (fetched once, then remembered)."""
+    todo = [(u, d) for u, d in devices.items()
+            if u not in DEVICE_INFO or DEVICE_INFO[u].get("_ip") != d["ip"]]
+    results = await asyncio.gather(*(fetch_device_info(d["ip"]) for _, d in todo))
+    for (u, d), info in zip(todo, results):
+        DEVICE_INFO[u] = {**info, "_ip": d["ip"]}
+    for u, d in devices.items():
+        d.update({k: v for k, v in DEVICE_INFO.get(u, {}).items() if not k.startswith("_")})
+
+
+def _reset_discovery() -> None:
+    """Forget every speaker (they may belong to a network we have left)."""
+    STATE.ip_pool.clear()
+    STATE.devices, STATE.groups = {}, []
+    STATE.transport, STATE.volumes, STATE.group_volumes = {}, {}, {}
+    DEVICE_INFO.clear()
+
+
+async def play_audio_clip(
+    client: httpx.AsyncClient, ip: str, player_id: str, stream_url: str, volume: int | None = None
+) -> None:
+    """Play an announcement clip *over* whatever a player is doing (ducks, then restores).
+
+    Uses the Sonos local audioClip API on port 1443 (self-signed cert → caller must use
+    an httpx client with verify=False). Does not disturb the underlying AirPlay/queue source.
+    """
+    body: dict[str, Any] = {"name": "Attention", "appId": "com.sonos.console", "streamUrl": stream_url}
+    if volume is not None:
+        body["volume"] = max(0, min(100, int(volume)))
+    r = await client.post(
+        f"https://{ip}:1443/api/v1/players/{player_id}/audioClip",
+        headers={"X-Sonos-Api-Key": SONOS_API_KEY, "Content-Type": "application/json"},
+        json=body,
+        timeout=6.0,
+    )
+    r.raise_for_status()
 
 
 # ---------- Refresh loop ----------
@@ -390,12 +500,21 @@ def _transport_sig(t: dict) -> tuple:
     return (t.get("title"), t.get("artist"), t.get("state"), t.get("art"))
 
 
-async def refresh_state() -> None:
+async def refresh_state(force_scan: bool = False) -> None:
     transport_before = {k: _transport_sig(v) for k, v in STATE.transport.items()}
+    prefix = await asyncio.to_thread(get_local_prefix)
+    if prefix != STATE.network_prefix:
+        if STATE.network_prefix is not None:
+            _log.info("Network changed (%s -> %s): looking for speakers again", STATE.network_prefix, prefix)
+            _reset_discovery()
+            _broadcast_state()
+            force_scan = True
+        STATE.network_prefix = prefix
     async with httpx.AsyncClient() as client:
+        if force_scan and prefix:
+            await asyncio.to_thread(prime_arp, prefix)   # wake every address so the ARP table is complete
         seed = await find_seed(client)
-        if not seed:
-            prefix = get_local_prefix()
+        if not seed and not force_scan:
             if prefix:
                 await asyncio.to_thread(prime_arp, prefix)
                 seed = await find_seed(client)
@@ -411,6 +530,7 @@ async def refresh_state() -> None:
             _log.error("Topology fetch failed: %s", e)
             return
 
+        await attach_device_info(devices)
         STATE.devices = devices
         STATE.groups = groups
         STATE.ip_pool.update(d["ip"] for d in devices.values())
@@ -467,11 +587,20 @@ async def refresh_state() -> None:
             _broadcast_state()
 
 
+def _get_lock() -> asyncio.Lock:
+    """One refresh at a time: the poll loop and a manual rescan must not run together."""
+    global _refresh_lock
+    if _refresh_lock is None:
+        _refresh_lock = asyncio.Lock()
+    return _refresh_lock
+
+
 async def refresh_loop() -> None:
     _log.info("Server started — polling Sonos every %.1fs", REFRESH_INTERVAL)
     while True:
         try:
-            await refresh_state()
+            async with _get_lock():
+                await refresh_state()
         except Exception as e:
             STATE.last_error = f"refresh loop: {e!r}"
             _log.error("Refresh loop crashed: %s", e)
@@ -673,6 +802,34 @@ async def api_prev(req: CoordReq) -> dict:
     transport = await refresh_coordinator(req.coordinator_uuid)
     asyncio.create_task(_settle_refresh(req.coordinator_uuid))
     return {"ok": True, "transport": transport}
+
+
+@app.post("/rescan")
+async def api_rescan() -> dict:
+    """Forget remembered speakers and search the network the computer is on right now."""
+    _log.info("Rescan requested")
+    started = time.time()
+    async with _get_lock():
+        _reset_discovery()
+        STATE.last_error = None
+        await refresh_state(force_scan=True)
+        STATE.last_scan = time.time()
+    _broadcast_state()
+    names = sorted(d["name"] for d in STATE.devices.values())
+    _log.info("Rescan finished: %d speaker(s) found", len(names))
+    return {
+        "ok": not STATE.last_error,
+        "found": len(names),
+        "speakers": names,
+        "seconds": round(time.time() - started, 1),
+        "network": await asyncio.to_thread(get_network_info),
+        "error": STATE.last_error,
+    }
+
+
+@app.get("/network")
+async def api_network() -> dict:
+    return await asyncio.to_thread(get_network_info)
 
 
 @app.get("/events")
@@ -887,14 +1044,42 @@ async def dashboard():
         reachable = vol.get("reachable", True)
         status_color = "#45e07a" if reachable else "#ff5f5f"
         status = "Online" if reachable else "Unreachable"
+        model = d.get("model") or "—"
+        if d.get("model_number"):
+            model += f' <span class="dim">({html.escape(d["model_number"])})</span>'
+        else:
+            model = html.escape(model) if not d.get("model") else html.escape(d["model"])
+        ann = d.get("announcements")
+        ann_html = ('<span style="color:#45e07a">✓ yes</span>' if ann
+                    else '<span style="color:#ffb84a">✗ no</span>' if ann is False else "—")
         device_rows += (
             f'<tr><td>{html.escape(d["name"])}</td>'
+            f'<td>{model}</td>'
             f'<td>{html.escape(d["ip"])}</td>'
             f'<td style="color:{status_color}">{status}</td>'
-            f'<td>{vol.get("volume", "—")}</td></tr>\n'
+            f'<td>{vol.get("volume", "—")}</td>'
+            f'<td>{ann_html}</td>'
+            f'<td class="dim">{html.escape(d.get("software") or "—")}</td></tr>\n'
         )
     if not device_rows:
-        device_rows = '<tr><td colspan="4" class="empty">No devices found</td></tr>'
+        device_rows = '<tr><td colspan="7" class="empty">No devices found. Try “Rescan for speakers”.</td></tr>'
+
+    net = await asyncio.to_thread(get_network_info)
+    if net["ssid"]:
+        wifi_html = html.escape(net["ssid"])
+    elif net["connection"] == "wifi":
+        wifi_html = ('<span class="dim">Hidden by macOS</span> — apps need Location Services permission to read the '
+                     'Wi-Fi name. The subnet below still tells networks apart.')
+    elif net["connection"] == "ethernet":
+        wifi_html = '<span class="dim">Wired (Ethernet), no Wi-Fi in use</span>'
+    else:
+        wifi_html = '<span class="dim">Not available</span>'
+    net_rows = (
+        f'<tr><th>Wi-Fi network</th><td>{wifi_html}</td></tr>'
+        f'<tr><th>This computer</th><td>{html.escape(net["ip"] or "not connected")}'
+        f'{" on " + html.escape(net["interface"]) if net["interface"] else ""}</td></tr>'
+        f'<tr><th>Subnet · router</th><td>{html.escape(net["subnet"] or "—")} · {html.escape(net["gateway"] or "—")}</td></tr>'
+    )
 
     error_html = ""
     if STATE.last_error:
@@ -935,6 +1120,18 @@ async def dashboard():
         announce_rows = '<div class="empty2">No announcements recorded yet.</div>'
 
     dash_extra_css = (
+        ".dim{color:var(--parchment);opacity:0.7;}"
+        "table.kv th{width:170px;white-space:nowrap;}"
+        ".actions{display:flex;align-items:center;gap:14px;margin-top:14px;flex-wrap:wrap;}"
+        ".rescan{font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.2em;text-transform:uppercase;"
+        "padding:9px 18px;border-radius:4px;border:1px solid var(--ink);cursor:pointer;font-weight:bold;color:var(--ink);"
+        "background:linear-gradient(180deg,var(--brass-hi),var(--brass-mid) 55%,var(--brass-lo));"
+        "box-shadow:var(--bevel-raised);transition:transform var(--dur-press) var(--ease-out);}"
+        ".rescan:active{transform:translateY(1px);}"
+        ".rescan:disabled{opacity:0.6;cursor:wait;}"
+        ".rescan:focus-visible{outline:2px solid var(--brass-hi);outline-offset:3px;}"
+        "#rescan-msg{font-family:'Courier New',monospace;font-size:12px;color:var(--cream);}"
+        "#rescan-msg.err{color:#ffb4a8;}"
         ".dtabs{display:flex;gap:6px;margin-bottom:20px;}"
         ".dtab{font-family:'Courier New',monospace;font-size:11px;letter-spacing:0.22em;text-transform:uppercase;"
         "padding:9px 20px;cursor:pointer;color:var(--parchment);"
@@ -1020,6 +1217,26 @@ async def dashboard():
           toast('\\ud83d\\uddd1 Announcement deleted','ok');
         }catch(e){ toast('\\u2717 Delete failed','err'); }
       }
+      (function(){
+        var btn=document.getElementById('rescan'), msg=document.getElementById('rescan-msg');
+        try{ var flash=sessionStorage.getItem('rescan_flash'); if(flash && msg){ msg.textContent=flash; sessionStorage.removeItem('rescan_flash'); } }catch(e){}
+        if(!btn) return;
+        btn.addEventListener('click', async function(){
+          clearTimeout(reloadTimer);
+          btn.disabled=true; var label=btn.textContent; btn.textContent='\u27f3 Scanning\u2026';
+          msg.className=''; msg.textContent='Looking for speakers on this network (can take up to ~15 seconds)\u2026';
+          try{
+            var r=await fetch('/rescan',{method:'POST'}); var d=await r.json();
+            var text = d.found ? 'Found '+d.found+' speaker'+(d.found===1?'':'s')+': '+d.speakers.join(', ') : 'No speakers found on this network.';
+            if(!d.found && d.error) text += ' ('+d.error+')';
+            try{ sessionStorage.setItem('rescan_flash', text); }catch(e){}
+            toast(text, d.found?'ok':'err', 5000);
+            setTimeout(function(){ location.reload(); }, 900);
+          }catch(e){
+            msg.className='err'; msg.textContent='Rescan failed: '+e; btn.disabled=false; btn.textContent=label;
+          }
+        });
+      })();
       (function(){ var t='monitoring'; try{t=localStorage.getItem('dash_tab')||'monitoring';}catch(e){} tab(t); })();
     </script>"""
 
@@ -1091,9 +1308,15 @@ async def dashboard():
   <button class="dtab" data-tab="flightlog" onclick="tab('flightlog')">✈ Flight Log</button>
 </div>
 <div data-panel="monitoring">
+  <h2>Network</h2>
+  <table class="kv">{net_rows}</table>
+  <div class="actions">
+    <button class="rescan" id="rescan" type="button">⟳ Rescan for speakers</button>
+    <span id="rescan-msg" role="status" aria-live="polite"></span>
+  </div>
   <h2>Devices</h2>
   <table>
-    <tr><th>Name</th><th>IP</th><th>Status</th><th>Volume</th></tr>
+    <tr><th>Name</th><th>Model</th><th>IP</th><th>Status</th><th>Volume</th><th>Announcements</th><th>Firmware</th></tr>
     {device_rows}
   </table>
   <h2>Event Log</h2>

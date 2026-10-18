@@ -19,6 +19,7 @@ When music is playing, you can't tell who started it or what's on. To turn the v
 - 🔗 **Add or remove speakers** from whatever is playing, so a room can join or leave the music in one tap.
 - ▶️ **See what's playing** on each group (AirPlay, Spotify and more), with album artwork, a vintage level-meter visualizer, and play, pause, next and previous.
 - 📣 **Voice announcements on all your speakers at once.** The fun part.
+- 🧭 **A dashboard** (`/dashboard`) showing the network you're on, each speaker's model, firmware and announcement support, and a **Rescan for speakers** button for when you move to another Wi-Fi.
 
 ### The announcement feature (Attention / Flight Attendant tab)
 
@@ -265,7 +266,9 @@ Open `https://<computer-ip>:8443` on the phone and accept the self-signed certif
 
 | Symptom | Likely cause |
 |---|---|
-| No speakers found | The computer isn't on the same network or subnet as the speakers. Check Wi-Fi, guest networks, VLANs and VPNs. |
+| No speakers found | The computer isn't on the same network or subnet as the speakers. Check Wi-Fi, guest networks, VLANs and VPNs, then press **Rescan for speakers** on the Dashboard. |
+| I moved my laptop to another Wi-Fi network | Captain Speaking notices the change within a few seconds and looks for speakers on the new network. You can also open the Dashboard and press **Rescan for speakers**. Speakers from the old network are removed from the list. |
+| The Dashboard says the Wi-Fi name is "Hidden by macOS" | Recent macOS versions only reveal the Wi-Fi name to apps with Location Services permission. Everything else works without it, and the subnet shown next to it still tells networks apart. |
 | Announcement is sent but nothing plays | The app is bound to `127.0.0.1`, `PUBLIC_HTTP_PORT` doesn't match the real port, or a firewall blocks the port. Use the `curl` check above. |
 | `audioClip to <room> failed` in the log | That speaker is unreachable or doesn't support audioClip. Check for `AUDIO_CLIP` (see [Sonos speakers](#sonos-speakers)). |
 | Announcement is too quiet or loud | Change the announcement volume in the Attention tab. The default is 45. |
@@ -307,12 +310,21 @@ Restores the most recent production snapshot and restarts the service.
 
 ## Tests
 
-The tests check the HTTP API of a running server. They don't need Sonos hardware.
+The unit tests need nothing running. The API tests check a running server. None of them need Sonos hardware.
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt
-TEST_URL=http://localhost:8787 .venv/bin/pytest tests/ -v
+.venv/bin/pytest tests/test_track_change.py tests/test_discovery.py -v      # unit tests
+TEST_URL=http://localhost:8787 .venv/bin/pytest tests/test_api.py -v       # API tests, server running
 ```
+
+### Try the app without any speakers
+
+```bash
+.venv/bin/python tests/mock_server.py      # then open http://localhost:8791
+```
+
+This runs the real app against three pretend speakers with four tracks and artwork. Next is slow to show the new track, like a real speaker. It is handy for working on the interface. Use `--lag 2.0` to make it slower.
 
 ---
 
@@ -327,7 +339,7 @@ scripts/install-launch-agent.sh    Start at login, restart if it stops
 scripts/uninstall-launch-agent.sh  Stop and remove the login item
 scripts/deploy.sh    Deploy to staging or production
 scripts/rollback.sh  Restore the last production snapshot
-tests/               API tests
+tests/               Unit tests, API tests and a mock-speaker server
 recordings/          Saved announcements (created at runtime, git-ignored)
 certs/               Self-signed TLS cert (created by deploy, git-ignored)
 ```
