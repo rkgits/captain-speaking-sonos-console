@@ -2,7 +2,7 @@
 
 *A vintage-style web console for your Sonos speakers, with whole-home voice announcements.*
 
-**Version 1.0** · Last updated: 17 October 2026
+**Version 1.1** · Last updated: 18 October 2026
 
 Created by **Reza K** ([@rkgits](https://github.com/rkgits)) · [GitHub profile](https://github.com/rkgits) · [Project board](https://github.com/users/rkgits/projects/2) · [MIT License](LICENSE)
 
