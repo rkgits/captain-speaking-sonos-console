@@ -128,9 +128,10 @@ cd captain-speaking-sonos-console
 `start.command` sets everything up the first time (virtual environment and packages), then starts the server and prints the addresses to open. You can also **double-click it in Finder**.
 
 - On the computer: <http://localhost:8787>
-- On your phone or another computer on the network: `http://<computer-ip>:8787` (the script prints it for you)
+- On another computer or a phone, to control music: `http://<computer-ip>:8787`
+- On a phone, **to record announcements**: `https://<computer-ip>:8443` (see [Recording from a phone](#recording-from-a-phone))
 
-To use another port: `PORT=8788 ./start.command`.
+The script prints the exact addresses for you. To use other ports: `PORT=8788 HTTPS_PORT=8444 ./start.command`.
 
 <details>
 <summary>Prefer to do it by hand?</summary>
@@ -182,7 +183,7 @@ Nothing else is installed on your computer. The app doesn't change your speakers
 | **`uvicorn` ≥ 0.29** | Web server | `pip`, via `requirements.txt` |
 | **`httpx` ≥ 0.27** | Talks to the speakers | `pip`, via `requirements.txt` |
 
-`ipconfig`, `arp` and `ping`, which the app calls for discovery, and `lsof` and `shasum`, which `start.command` uses, all ship with macOS. Recording uses your browser's microphone, so there's nothing to install for it.
+`ipconfig`, `arp` and `ping`, which the app calls for discovery, and `lsof`, `shasum` and `openssl`, which `start.command` uses (`openssl` makes the certificate for the secure address), all ship with macOS. Recording uses your browser's microphone, so there's nothing to install for it.
 
 The Python packages are pinned only as minimums in [requirements.txt](requirements.txt). The author's tested versions were `fastapi 0.128`, `uvicorn 0.39`, `httpx 0.28` and `pydantic 2.13` (installed automatically with FastAPI).
 
@@ -249,22 +250,28 @@ curl -s -o /dev/null -w "%{http_code}\n" http://<computer-ip>:8787/recordings/<f
 
 ## Recording from a phone
 
-Browsers only allow microphone access on `localhost` or over HTTPS. To record from a phone, run a second, HTTPS listener alongside the HTTP one:
+Browsers only let a page use the microphone if it is **secure**: either `localhost` or an `https://` address. This is a rule in the browser (Safari, Chrome and others), so there is no way to record over plain `http://` from a phone.
 
-```bash
-mkdir -p certs
-openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-  -keyout certs/key.pem -out certs/cert.pem -subj "/CN=sonos.local" \
-  -addext "subjectAltName=DNS:sonos.local,DNS:localhost,IP:<computer-ip>,IP:127.0.0.1"
+`./start.command` takes care of it. It serves the app on **two addresses** at once:
 
-# plain HTTP, which the speakers fetch from
-PUBLIC_HTTP_PORT=8787 HTTPS_PORT=8443 .venv/bin/uvicorn app:app --host 0.0.0.0 --port 8787 &
-# HTTPS, which the phone uses
-PUBLIC_HTTP_PORT=8787 HTTPS_PORT=8443 .venv/bin/uvicorn app:app --host 0.0.0.0 --port 8443 \
-  --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
-```
+| Address | Use it for |
+|---|---|
+| `http://<computer-ip>:8787` | Controlling music from any device. The speakers also download your announcements from this one. |
+| `https://<computer-ip>:8443` | **Recording announcements from a phone** |
 
-Open `https://<computer-ip>:8443` on the phone and accept the self-signed certificate warning. If you open the page over plain HTTP, the Attention tab links you to the HTTPS address. `scripts/deploy.sh` sets all this up for you.
+The first time, it creates a certificate for your computer's current IP address and keeps it in `certs/` (never committed). It renews the certificate by itself if it expires or the computer gets a new IP.
+
+**On your phone:**
+
+1. Open the `https://` address the script printed. If you're on the plain `http://` page, the Attention tab shows a link to it.
+2. Your browser will warn that the connection isn't private. That is expected: the certificate is your own, made on your own computer, and your browser has no way to know it.
+   - **iPhone (Safari):** tap **Show Details**, then **visit this website**, then confirm.
+   - **Android (Chrome):** tap **Advanced**, then **Proceed to ...**
+3. Open the **Attention** tab and allow the microphone when asked.
+
+You only need to do this once per phone, unless the computer's IP address changes.
+
+To turn the secure address off, start with `HTTPS_PORT=0 ./start.command`.
 
 ---
 
@@ -273,7 +280,8 @@ Open `https://<computer-ip>:8443` on the phone and accept the self-signed certif
 | Variable | Default | Purpose |
 |---|---|---|
 | `PUBLIC_HTTP_PORT` | `8787` | Port speakers use to download recordings. Must be the plain-HTTP port. |
-| `HTTPS_PORT` | `0` (off) | HTTPS port shown in the UI for phone recording. |
+| `HTTPS_PORT` | `8443` with `start.command`, `0` (off) when you run `uvicorn` yourself | Secure port for phone recording. Set `0` to turn it off. |
+| `PORT` | `8787` | Plain-HTTP port used by `start.command`. |
 
 ---
 
@@ -314,7 +322,7 @@ The computer must be on the same network as the speakers (see [Is my setup suppo
 | `audioClip to <room> failed` in the log | That speaker is unreachable or doesn't support audioClip. Check for `AUDIO_CLIP` (see [Sonos speakers](#sonos-speakers)). |
 | Announcement is too quiet or loud | Change the announcement volume in the Attention tab. The default is 45. |
 | `Play failed: 500 Internal Server Error` | The ▶ button was pressed on a speaker streaming over AirPlay. Sonos doesn't accept play and pause there. Control playback from the AirPlay source (your phone or Mac). |
-| Microphone permission never appears on a phone | The page is on plain HTTP. Use the HTTPS address. |
+| "Recording needs a secure page" or no microphone prompt on a phone | The page is on plain `http://`. Open the `https://` address instead and accept the one-time certificate warning (see [Recording from a phone](#recording-from-a-phone)). |
 | A room has the wrong name | Rename it in the Sonos app. This app can't rename speakers. |
 
 ---
