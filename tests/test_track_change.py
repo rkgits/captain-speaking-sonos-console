@@ -32,17 +32,21 @@ def test_refresh_coordinator_pushes_to_open_pages_when_the_track_changes(monkeyp
         return dict(reported["value"])
 
     monkeypatch.setattr(A, "get_transport", fake_get_transport)
-    queue = asyncio.Queue(maxsize=5)
-    A._sse_clients.add(queue)
-    try:
-        # Unchanged track: nothing is pushed
-        asyncio.run(A.refresh_coordinator(COORD))
-        assert queue.empty()
 
-        # The speaker now reports the next track: open pages are told straight away
-        reported["value"] = _transport("Song Two", "http://x/2.jpg")
-        asyncio.run(A.refresh_coordinator(COORD))
-        assert not queue.empty()
-        assert "Song Two" in queue.get_nowait()
-    finally:
-        A._sse_clients.discard(queue)
+    async def scenario():
+        queue = asyncio.Queue(maxsize=5)
+        A._sse_clients.add(queue)
+        try:
+            # Unchanged track: nothing is pushed
+            await A.refresh_coordinator(COORD)
+            assert queue.empty()
+
+            # The speaker now reports the next track: open pages are told straight away
+            reported["value"] = _transport("Song Two", "http://x/2.jpg")
+            await A.refresh_coordinator(COORD)
+            assert not queue.empty()
+            assert "Song Two" in queue.get_nowait()
+        finally:
+            A._sse_clients.discard(queue)
+
+    asyncio.run(scenario())
