@@ -29,8 +29,21 @@ Record a message in your browser, optionally wrapped in an airplane chime, and i
 
 ---
 
+## Screenshots
+
+**The console.** Album artwork, a vintage level-meter display, transport and master volume, indicator lamps, and one fader per speaker.
+
+![The Captain Speaking console: album artwork and level meters on top, with a volume fader for each of four speakers below](docs/screenshots/console.webp)
+
+**The Attention tab.** Record a message, choose whether the airplane chime wraps it, and broadcast it over your music to every speaker at once.
+
+![The Attention tab: a cockpit photo, an announcement volume slider, the chime on/off keys and a red record button with a vintage microphone](docs/screenshots/attention.webp)
+
+---
+
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Is my setup supported?](#is-my-setup-supported)
 - [Quick start](#quick-start) (including start at login, stop and uninstall)
 - [Everything you need to install](#everything-you-need-to-install)
@@ -44,6 +57,7 @@ Record a message in your browser, optionally wrapped in an airplane chime, and i
 - [Tests](#tests)
 - [Project layout](#project-layout)
 - [Security note](#security-note)
+- [Contributing and security](#contributing-and-security)
 - [License](#license)
 - [Roadmap and credits](#roadmap-and-credits)
 
@@ -367,6 +381,9 @@ scripts/uninstall-launch-agent.sh  Stop and remove the login item
 scripts/deploy.sh    Deploy to staging or production
 scripts/rollback.sh  Restore the last production snapshot
 tests/               Unit tests, API tests and a mock-speaker server
+docs/screenshots/    Screenshots used in this README
+.github/             Issue and pull request templates
+CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md   Community files
 recordings/          Saved announcements (created at runtime, git-ignored)
 certs/               Self-signed TLS cert (created by deploy, git-ignored)
 ```
@@ -376,6 +393,14 @@ certs/               Self-signed TLS cert (created by deploy, git-ignored)
 ## Security note
 
 The app has **no login**. Anyone who can reach its port can control your speakers and broadcast audio through them. Run it only on a trusted home network, and never expose it to the internet.
+
+---
+
+## Contributing and security
+
+Contributions are welcome, from bug reports to code. Start with [CONTRIBUTING.md](CONTRIBUTING.md), which explains how to run the app without speakers and how to send a pull request. Please read the [Code of Conduct](CODE_OF_CONDUCT.md) too.
+
+**Found a security problem?** Please don't open a public issue. Follow [SECURITY.md](SECURITY.md) and report it privately.
 
 ---
 
