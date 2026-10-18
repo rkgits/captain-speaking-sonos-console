@@ -38,6 +38,7 @@ Record a message in your browser, optionally wrapped in an airplane chime, and i
 - [How it works](#how-it-works)
 - [Recording from a phone](#recording-from-a-phone)
 - [Configuration](#configuration)
+- [Finding speakers: scan for new speakers](#finding-speakers-scan-for-new-speakers)
 - [Troubleshooting](#troubleshooting)
 - [Deploying as a service](#deploying-as-a-service)
 - [Tests](#tests)
@@ -259,6 +260,32 @@ Open `https://<computer-ip>:8443` on the phone and accept the self-signed certif
 |---|---|---|
 | `PUBLIC_HTTP_PORT` | `8787` | Port speakers use to download recordings. Must be the plain-HTTP port. |
 | `HTTPS_PORT` | `0` (off) | HTTPS port shown in the UI for phone recording. |
+
+---
+
+## Finding speakers: scan for new speakers
+
+Captain Speaking finds your speakers by itself when it starts and keeps checking every couple of seconds. You only need to scan by hand when something changed:
+
+- **You added a new speaker** to your Sonos system and it isn't in the list yet.
+- **You moved to a different network**, for example you took your laptop to another Wi-Fi. The app notices within a few seconds, but you can force it.
+- **A speaker is missing** after a router restart or an IP address change.
+
+To scan:
+
+1. Open the **Dashboard** (the link at the top right of the console, or `http://localhost:8787/dashboard`).
+2. Press **⟳ Rescan for speakers**.
+3. Wait up to about 15 seconds. The page reloads and tells you what it found, for example "Found 4 speakers: Kitchen, Bedroom, ...".
+
+A rescan forgets the speakers it remembered, so ones from a network you left disappear, then searches the network the computer is on right now. The Dashboard also shows that network (Wi-Fi name when macOS allows it, plus the subnet and router) and each speaker's model, firmware and announcement support.
+
+You can start a scan from a terminal too:
+
+```bash
+curl -X POST http://localhost:8787/rescan
+```
+
+The computer must be on the same network as the speakers (see [Is my setup supported?](#is-my-setup-supported)), because the scan only looks at the computer's own subnet.
 
 ---
 
