@@ -385,8 +385,13 @@ async def find_seed(client: httpx.AsyncClient) -> str | None:
 
 
 # ---------- Refresh loop ----------
+def _transport_sig(t: dict) -> tuple:
+    """What a client needs to redraw the now-playing panel: track, state and artwork."""
+    return (t.get("title"), t.get("artist"), t.get("state"), t.get("art"))
+
+
 async def refresh_state() -> None:
-    transport_before = {k: (v.get("title"), v.get("state")) for k, v in STATE.transport.items()}
+    transport_before = {k: _transport_sig(v) for k, v in STATE.transport.items()}
     async with httpx.AsyncClient() as client:
         seed = await find_seed(client)
         if not seed:
@@ -457,7 +462,7 @@ async def refresh_state() -> None:
                 del STATE.group_volumes[k]
 
         # Broadcast to SSE clients if track or play state changed
-        transport_after = {k: (v.get("title"), v.get("state")) for k, v in STATE.transport.items()}
+        transport_after = {k: _transport_sig(v) for k, v in STATE.transport.items()}
         if transport_before != transport_after:
             _broadcast_state()
 
@@ -514,10 +519,21 @@ async def refresh_coordinator(coord_uuid: str) -> dict | None:
     try:
         async with httpx.AsyncClient() as client:
             transport = await get_transport(client, dev["ip"])
+        changed = _transport_sig(STATE.transport.get(coord_uuid, {})) != _transport_sig(transport)
         STATE.transport[coord_uuid] = transport
+        if changed:
+            _broadcast_state()   # other open pages should not wait for the next poll
         return transport
     except Exception:
         return None
+
+
+async def _settle_refresh(coord_uuid: str) -> None:
+    """Speakers report a new track a moment after Next/Previous. Re-read a couple of times so the
+    page shows the new title and artwork promptly (refresh_coordinator pushes the change)."""
+    for delay in (0.6, 0.9):
+        await asyncio.sleep(delay)
+        await refresh_coordinator(coord_uuid)
 
 
 # ---------- API ----------
@@ -642,6 +658,7 @@ async def api_next(req: CoordReq) -> dict:
         raise _transport_error("Next", e)
     await asyncio.sleep(0.15)
     transport = await refresh_coordinator(req.coordinator_uuid)
+    asyncio.create_task(_settle_refresh(req.coordinator_uuid))
     return {"ok": True, "transport": transport}
 
 
@@ -654,6 +671,7 @@ async def api_prev(req: CoordReq) -> dict:
         raise _transport_error("Prev", e)
     await asyncio.sleep(0.15)
     transport = await refresh_coordinator(req.coordinator_uuid)
+    asyncio.create_task(_settle_refresh(req.coordinator_uuid))
     return {"ok": True, "transport": transport}
 
 
@@ -841,7 +859,8 @@ async def album_art(uuid: str):
 
 @app.get("/")
 async def root():
-    return FileResponse(os.path.join(BASE, "static", "index.html"))
+    # no-cache: browsers must revalidate, so an upgraded app is never shown with its old page code
+    return FileResponse(os.path.join(BASE, "static", "index.html"), headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/dashboard")
