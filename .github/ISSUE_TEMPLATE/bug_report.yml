@@ -1,0 +1,66 @@
+name: Bug report
+description: Something doesn't work the way it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please **don't paste real IP addresses, room names or MAC addresses**. Use made-up ones like `192.168.1.20` and `Kitchen`.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you see, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Play something from Spotify
+        2. Press Next
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Captain Speaking version
+      description: Shown in the page header (for example v1.1).
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "For example: macOS 26.0"
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      description: Run `python3 --version`.
+  - type: input
+    id: speakers
+    attributes:
+      label: Speaker models and software
+      description: The Dashboard lists them. Models and firmware only, no names.
+      placeholder: "Beam, Era 100 x3, firmware 97.2"
+  - type: dropdown
+    id: source
+    attributes:
+      label: What was playing?
+      options:
+        - Spotify
+        - AirPlay
+        - Sonos radio or other streaming service
+        - Music library or line-in
+        - Nothing / not related to playback
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log output or screenshots
+      description: The Dashboard's Event Log or your terminal output helps a lot. Remove anything private first.
+      render: shell
